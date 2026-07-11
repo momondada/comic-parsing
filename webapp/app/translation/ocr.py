@@ -82,7 +82,6 @@ def read_lines(image_bytes: bytes) -> list[OcrLine]:
             return _read_lines_single(image_bytes)
 
         all_lines: list[OcrLine] = []
-        seen: set[tuple[str, int, int]] = set()
         y = 0
         while True:
             strip_bottom = min(y + STRIP_HEIGHT, height)
@@ -98,10 +97,13 @@ def read_lines(image_bytes: bytes) -> list[OcrLine]:
                     max_x=line.max_x,
                     max_y=line.max_y + y,
                 )
-                # De-dupe lines re-detected in the overlap between strips.
-                key = (adjusted.text, round(adjusted.min_x / 10), round(adjusted.min_y / 10))
-                if key not in seen:
-                    seen.add(key)
+                # De-dupe lines re-detected in the overlap between strips by
+                # POSITION, not text: the same physical line can OCR
+                # slightly differently across two crops (e.g. a strip edge
+                # clipping a letter), so an exact-text check lets both the
+                # good and the garbled reading through — which then get
+                # concatenated into one corrupted bubble by the merge step.
+                if not _overlaps_existing(adjusted, all_lines):
                     all_lines.append(adjusted)
 
             if strip_bottom >= height:
@@ -109,3 +111,18 @@ def read_lines(image_bytes: bytes) -> list[OcrLine]:
             y += STRIP_HEIGHT - STRIP_OVERLAP
 
         return all_lines
+
+
+def _overlaps_existing(line: OcrLine, existing: list[OcrLine]) -> bool:
+    for other in existing:
+        y_overlap = min(line.max_y, other.max_y) - max(line.min_y, other.min_y)
+        x_overlap = min(line.max_x, other.max_x) - max(line.min_x, other.min_x)
+        if y_overlap <= 0 or x_overlap <= 0:
+            continue
+        line_area = (line.max_x - line.min_x) * (line.max_y - line.min_y)
+        other_area = (other.max_x - other.min_x) * (other.max_y - other.min_y)
+        overlap_area = x_overlap * y_overlap
+        smaller_area = min(line_area, other_area)
+        if smaller_area > 0 and overlap_area / smaller_area > 0.5:
+            return True
+    return False
