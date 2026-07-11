@@ -25,4 +25,9 @@ BATCHES_TABLE_NAME = os.environ.get("BATCHES_TABLE_NAME", "batches")
 # is used instead, matching the storage auth pattern above.
 AI_SERVICES_ENDPOINT = os.environ.get("AZURE_AI_SERVICES_ENDPOINT")
 AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
+# Required for the Translator API specifically when authenticating with a
+# token (Managed Identity) against a multi-service resource's own endpoint —
+# the service uses these to resolve which resource the token is for.
+AI_SERVICES_REGION = os.environ.get("AZURE_AI_SERVICES_REGION")
+AI_SERVICES_RESOURCE_ID = os.environ.get("AZURE_AI_SERVICES_RESOURCE_ID")
 TRANSLATE_TARGET_LANGUAGE = os.environ.get("TRANSLATE_TARGET_LANGUAGE", "zh-Hant")
