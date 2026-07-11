@@ -1,43 +1,64 @@
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from io import BytesIO
 
+from PIL import Image
 from starlette.concurrency import run_in_threadpool
 
 from ..storage import blob, tables
-from ..translation.gpt_translate import translate_page
+from ..translation.bubbles import merge_lines_into_bubbles
+from ..translation.gpt_translate import normalize_and_translate
+from ..translation.ocr import read_lines
 
 MAX_WORKERS = 4
 
 
-def _process_page(comic: str, chapter_row_key: str, filename: str):
+def _ocr_page(comic: str, chapter_row_key: str, filename: str):
     body = blob.download_page(comic, chapter_row_key, filename)
-    bubbles = translate_page(body)
-    return filename, [
-        {
-            "text_en": b.text_en,
-            "text_zh": b.text_zh,
-            "left_pct": b.left_pct,
-            "top_pct": b.top_pct,
-            "width_pct": b.width_pct,
-            "height_pct": b.height_pct,
-        }
-        for b in bubbles
-    ]
+    with Image.open(BytesIO(body)) as img:
+        width, height = img.size
+    lines = read_lines(body)
+    bubbles = merge_lines_into_bubbles(lines, width, height)
+    return filename, bubbles
 
 
 def _process_chapter(comic: str, chapter_row_key: str) -> dict:
     filenames = blob.list_page_filenames(comic, chapter_row_key)
     filenames = [f for f in filenames if f.endswith(".jpg")]
 
-    pages = {}
+    per_page_bubbles = {}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
-            executor.submit(_process_page, comic, chapter_row_key, filename)
+            executor.submit(_ocr_page, comic, chapter_row_key, filename)
             for filename in filenames
         ]
         for future in as_completed(futures):
-            filename, entries = future.result()
-            pages[filename] = entries
+            filename, bubbles = future.result()
+            per_page_bubbles[filename] = bubbles
+
+    all_texts = [
+        bubble.text_en for bubbles in per_page_bubbles.values() for bubble in bubbles
+    ]
+    translations = normalize_and_translate(all_texts)
+
+    pages = {}
+    idx = 0
+    for filename, bubbles in per_page_bubbles.items():
+        page_entries = []
+        for bubble in bubbles:
+            text_en, text_zh = translations[idx]
+            page_entries.append(
+                {
+                    "text_en": text_en,
+                    "text_zh": text_zh,
+                    "left_pct": bubble.left_pct,
+                    "top_pct": bubble.top_pct,
+                    "width_pct": bubble.width_pct,
+                    "height_pct": bubble.height_pct,
+                }
+            )
+            idx += 1
+        pages[filename] = page_entries
 
     return {"pages": pages}
 

@@ -19,15 +19,24 @@ CHAPTERS_TABLE_NAME = os.environ.get("CHAPTERS_TABLE_NAME", "chapters")
 COMICS_TABLE_NAME = os.environ.get("COMICS_TABLE_NAME", "comics")
 BATCHES_TABLE_NAME = os.environ.get("BATCHES_TABLE_NAME", "batches")
 
-# Translation overlay: no local emulator exists for Cognitive Services, so
-# AI_SERVICES_KEY (optional) lets local dev hit a real resource with a key;
-# on Azure this is left unset and DefaultAzureCredential (Managed Identity)
-# is used instead, matching the storage auth pattern above.
-_ai_services_endpoint_raw = os.environ.get("AZURE_AI_SERVICES_ENDPOINT")
-# Strip any trailing slash: the SDKs append their own path (e.g.
-# /translator/text/v...), and a double slash in that join 404s at the gateway.
-AI_SERVICES_ENDPOINT = (
-    _ai_services_endpoint_raw.rstrip("/") if _ai_services_endpoint_raw else None
-)
+# Translation overlay uses TWO separate Azure resources:
+#   - Vision (OCR) — a Cognitive Services / AIServices account
+#   - GPT (translation) — a Foundry-created resource with a model deployment
+# No local emulator exists for either, so *_KEY (optional) lets local dev hit
+# real resources with a key; on Azure these are left unset and
+# DefaultAzureCredential (Managed Identity) is used instead, matching the
+# storage auth pattern above.
+
+
+def _strip_trailing_slash(value: str | None) -> str | None:
+    # The SDKs append their own path (e.g. /openai/v1), and a double slash
+    # in that join 404s at the gateway.
+    return value.rstrip("/") if value else None
+
+
+AI_SERVICES_ENDPOINT = _strip_trailing_slash(os.environ.get("AZURE_AI_SERVICES_ENDPOINT"))
 AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
+
+AZURE_OPENAI_ENDPOINT = _strip_trailing_slash(os.environ.get("AZURE_OPENAI_ENDPOINT"))
+AZURE_OPENAI_KEY = os.environ.get("AZURE_OPENAI_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")

@@ -1,6 +1,4 @@
-import base64
 import json
-from dataclasses import dataclass
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import OpenAI
@@ -8,81 +6,63 @@ from openai import OpenAI
 from .. import config
 
 TOKEN_SCOPE = "https://ai.azure.com/.default"
+CHUNK_SIZE = 150
 
-SYSTEM_PROMPT = (
-    "You are analyzing a single comic/manga page image. Identify every "
-    "dialogue or speech bubble that contains English text. For each bubble, "
-    "return the original English text (text_en) and its Traditional Chinese "
-    "(zh-Hant) translation (text_zh). Comic lettering is conventionally "
-    "printed in ALL CAPS — for text_en, normalize it to natural sentence "
-    "case (e.g. \"THIS IS A BOOK.\" becomes \"This is a book.\"), preserving "
-    "any words that are genuinely acronyms, proper nouns, or emphasized in "
-    "the original. Also estimate each bubble's bounding box as percentages "
-    "of the full image width/height, where (0, 0) is the top-left corner. "
-    "Respond with ONLY JSON, no markdown, in this exact shape: "
-    '{"bubbles": [{"text_en": "...", "text_zh": "...", "left_pct": 0.0, '
-    '"top_pct": 0.0, "width_pct": 0.0, "height_pct": 0.0}, ...]}. If there '
-    'is no text on the page, respond with {"bubbles": []}.'
+INSTRUCTIONS = (
+    "You will receive a JSON array of raw OCR-extracted comic dialogue "
+    "lines. Comic lettering is conventionally printed in ALL CAPS. For "
+    "each input string, return: (1) text_en: the same text normalized to "
+    'natural sentence case (e.g. "THIS IS A BOOK." becomes "This is a '
+    'book."), preserving genuine acronyms, proper nouns, or emphasis from '
+    "the original, and (2) text_zh: its Traditional Chinese (zh-Hant) "
+    "translation. Respond with ONLY JSON, no markdown, in this exact "
+    'shape: {"items": [{"text_en": "...", "text_zh": "..."}, ...]}, with '
+    "exactly one item per input string, in the same order as the input."
 )
 
 _client = None
 
 
-@dataclass
-class Bubble:
-    text_en: str
-    text_zh: str
-    left_pct: float
-    top_pct: float
-    width_pct: float
-    height_pct: float
-
-
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        if config.AI_SERVICES_KEY:
-            _client = OpenAI(base_url=config.AI_SERVICES_ENDPOINT, api_key=config.AI_SERVICES_KEY)
+        if config.AZURE_OPENAI_KEY:
+            _client = OpenAI(base_url=config.AZURE_OPENAI_ENDPOINT, api_key=config.AZURE_OPENAI_KEY)
         else:
             token_provider = get_bearer_token_provider(DefaultAzureCredential(), TOKEN_SCOPE)
-            _client = OpenAI(base_url=config.AI_SERVICES_ENDPOINT, api_key=token_provider)
+            _client = OpenAI(base_url=config.AZURE_OPENAI_ENDPOINT, api_key=token_provider)
     return _client
 
 
-def translate_page(image_bytes: bytes) -> list[Bubble]:
-    b64 = base64.b64encode(image_bytes).decode("ascii")
+def _translate_chunk(texts: list[str]) -> list[tuple[str, str]]:
     client = _get_client()
-
     response = client.responses.create(
         model=config.AZURE_OPENAI_DEPLOYMENT,
-        instructions=SYSTEM_PROMPT,
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_image",
-                        "image_url": f"data:image/jpeg;base64,{b64}",
-                    }
-                ],
-            }
-        ],
-        max_output_tokens=4000,
+        instructions=INSTRUCTIONS,
+        input=json.dumps(texts, ensure_ascii=False),
+        max_output_tokens=8000,
     )
 
     if not response.output_text:
-        print(f"[diagnostic] empty output_text, raw response: {response.model_dump_json()}", flush=True)
+        print(
+            f"[diagnostic] empty output_text, raw response: {response.model_dump_json()}",
+            flush=True,
+        )
 
     data = json.loads(response.output_text)
+    return [(item["text_en"], item["text_zh"]) for item in data["items"]]
 
-    return [
-        Bubble(
-            text_en=b["text_en"],
-            text_zh=b["text_zh"],
-            left_pct=b["left_pct"],
-            top_pct=b["top_pct"],
-            width_pct=b["width_pct"],
-            height_pct=b["height_pct"],
-        )
-        for b in data.get("bubbles", [])
-    ]
+
+def normalize_and_translate(texts: list[str]) -> list[tuple[str, str]]:
+    """Given raw OCR text per bubble, return (normalized_en, zh) pairs.
+
+    Pure text in/out — no image involved, so this doesn't depend on a
+    vision model's ability to also localize bubbles (that's OCR's job).
+    """
+    if not texts:
+        return []
+
+    results: list[tuple[str, str]] = []
+    for start in range(0, len(texts), CHUNK_SIZE):
+        results.extend(_translate_chunk(texts[start : start + CHUNK_SIZE]))
+    return results
