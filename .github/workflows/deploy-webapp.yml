@@ -8,6 +8,12 @@ on:
       - ".github/workflows/deploy-webapp.yml"
   workflow_dispatch:
 
+# Serialize deploys: without this, overlapping runs from rapid pushes can
+# finish out of order and an older run's deploy step overwrites a newer one.
+concurrency:
+  group: deploy-webapp
+  cancel-in-progress: true
+
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/comic-parsing-webapp
 
