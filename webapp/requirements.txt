@@ -8,4 +8,4 @@ pillow==11.1.0
 azure-storage-blob==12.24.0
 azure-data-tables==12.5.0
 azure-identity==1.19.0
-requests==2.32.3
+openai==1.55.3

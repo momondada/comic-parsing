@@ -1,14 +1,14 @@
 import base64
 import json
-from dataclasses import dataclass
 
-import requests
 from azure.identity import DefaultAzureCredential
+from dataclasses import dataclass
+from openai import AzureOpenAI
 
 from .. import config
 
-API_VERSION = "2024-10-21"
-TOKEN_SCOPE = "https://ai.azure.com/.default"
+API_VERSION = "2025-04-01-preview"
+TOKEN_SCOPE = "https://cognitiveservices.azure.com/.default"
 
 SYSTEM_PROMPT = (
     "You are analyzing a single comic/manga page image. Identify every "
@@ -33,54 +33,46 @@ class Bubble:
     height_pct: float
 
 
-def _get_token() -> str:
+def _get_client() -> AzureOpenAI:
     global _credential
+    if config.AI_SERVICES_KEY:
+        return AzureOpenAI(
+            api_key=config.AI_SERVICES_KEY,
+            api_version=API_VERSION,
+            azure_endpoint=config.AI_SERVICES_ENDPOINT,
+        )
     if _credential is None:
         _credential = DefaultAzureCredential()
-    return _credential.get_token(TOKEN_SCOPE).token
+    token = _credential.get_token(TOKEN_SCOPE).token
+    return AzureOpenAI(
+        azure_ad_token=token,
+        api_version=API_VERSION,
+        azure_endpoint=config.AI_SERVICES_ENDPOINT,
+    )
 
 
 def translate_page(image_bytes: bytes) -> list[Bubble]:
     b64 = base64.b64encode(image_bytes).decode("ascii")
-    url = (
-        f"{config.AI_SERVICES_ENDPOINT}/openai/deployments/"
-        f"{config.AZURE_OPENAI_DEPLOYMENT}/chat/completions"
-    )
+    client = _get_client()
 
-    headers = {"Content-Type": "application/json"}
-    if config.AI_SERVICES_KEY:
-        headers["api-key"] = config.AI_SERVICES_KEY
-    else:
-        headers["Authorization"] = f"Bearer {_get_token()}"
-
-    body = {
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+    response = client.responses.create(
+        model=config.AZURE_OPENAI_DEPLOYMENT,
+        instructions=SYSTEM_PROMPT,
+        input=[
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{b64}",
                     }
                 ],
-            },
+            }
         ],
-        "response_format": {"type": "json_object"},
-        "max_tokens": 4000,
-    }
-
-    response = requests.post(
-        url,
-        params={"api-version": API_VERSION},
-        headers=headers,
-        json=body,
-        timeout=60,
+        max_output_tokens=4000,
     )
-    response.raise_for_status()
 
-    content = response.json()["choices"][0]["message"]["content"]
-    data = json.loads(content)
+    data = json.loads(response.output_text)
 
     return [
         Bubble(

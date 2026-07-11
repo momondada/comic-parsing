@@ -83,7 +83,14 @@ az role assignment create \
   --scope "$STORAGE_ACCOUNT_ID" \
   --output none
 
-echo "==> Creating Azure AI services resource (hosts the GPT-4o deployment)..."
+echo "==> Creating Azure AI services resource..."
+# NOTE: a plain "az cognitiveservices account create --kind AIServices" (as
+# below) does NOT get Model deployments / Azure OpenAI support in every
+# subscription — if "Model deployments" doesn't show up on this resource,
+# create the OpenAI-capable resource via https://ai.azure.com (Azure AI
+# Foundry) instead, deploy the model there (Global Standard deployment type
+# avoids per-region GPU quota issues), then point AZURE_AI_SERVICES_ENDPOINT
+# / AZURE_OPENAI_DEPLOYMENT at that resource instead of this one.
 # If this tenant's policy also blocks public network access on this resource
 # (as it did for Storage), the app will fail to reach it and the same fix
 # applies: add a Private Endpoint (subresource "account") on comic-parsing-vnet
@@ -115,8 +122,8 @@ az role assignment create \
   --scope "$AI_SERVICES_ID" \
   --output none
 
-echo "==> Now deploy a gpt-4o model onto this resource in Azure AI Foundry"
-echo "    (portal.azure.com -> comic-parsing-ai -> Model deployments), then"
+echo "==> Now deploy a vision-capable chat model (e.g. gpt-5.4-pro) onto"
+echo "    this resource (or a Foundry-created one, see note above), then"
 echo "    re-run/continue to set the app settings below with its deployment name."
 
 echo "==> Configuring app settings and Always On..."
@@ -127,7 +134,7 @@ az webapp config appsettings set \
     AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT" \
     BLOB_CONTAINER_NAME="$BLOB_CONTAINER" \
     AZURE_AI_SERVICES_ENDPOINT="$AI_SERVICES_ENDPOINT" \
-    AZURE_OPENAI_DEPLOYMENT="gpt-4o" \
+    AZURE_OPENAI_DEPLOYMENT="gpt-5.4-pro" \
     WEBSITES_PORT=8000 \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
   --output none
