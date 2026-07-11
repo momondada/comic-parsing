@@ -20,6 +20,8 @@ _service_client = _make_client()
 def ensure_tables() -> None:
     _service_client.create_table_if_not_exists(config.JOBS_TABLE_NAME)
     _service_client.create_table_if_not_exists(config.CHAPTERS_TABLE_NAME)
+    _service_client.create_table_if_not_exists(config.COMICS_TABLE_NAME)
+    _service_client.create_table_if_not_exists(config.BATCHES_TABLE_NAME)
 
 
 def _jobs_client():
@@ -28,6 +30,14 @@ def _jobs_client():
 
 def _chapters_client():
     return _service_client.get_table_client(config.CHAPTERS_TABLE_NAME)
+
+
+def _comics_client():
+    return _service_client.get_table_client(config.COMICS_TABLE_NAME)
+
+
+def _batches_client():
+    return _service_client.get_table_client(config.BATCHES_TABLE_NAME)
 
 
 def _now() -> str:
@@ -110,5 +120,59 @@ def list_chapters(comic: str) -> list[dict]:
 def get_chapter(comic: str, chapter_row_key: str) -> dict | None:
     try:
         return dict(_chapters_client().get_entity(comic, chapter_row_key))
+    except ResourceNotFoundError:
+        return None
+
+
+def upsert_comic_template(comic: str, url_template: str) -> None:
+    _comics_client().upsert_entity(
+        {"PartitionKey": "comic", "RowKey": comic, "url_template": url_template}
+    )
+
+
+def get_comic_template(comic: str) -> str | None:
+    try:
+        entity = _comics_client().get_entity("comic", comic)
+    except ResourceNotFoundError:
+        return None
+    return entity.get("url_template")
+
+
+def create_batch(batch_id: str, comic: str, start: int, end: int) -> None:
+    _batches_client().create_entity(
+        {
+            "PartitionKey": "batch",
+            "RowKey": batch_id,
+            "comic": comic,
+            "start": start,
+            "end": end,
+            "total": end - start + 1,
+            "done": 0,
+            "skipped": 0,
+            "failed": 0,
+            "current_chapter": "",
+            "status": "pending",
+            "error": "",
+            "created_at": _now(),
+        }
+    )
+
+
+def update_batch(batch_id: str, **fields) -> None:
+    entity = {"PartitionKey": "batch", "RowKey": batch_id, **fields}
+    _batches_client().update_entity(entity, mode="merge")
+
+
+def increment_batch(batch_id: str, **counters) -> None:
+    client = _batches_client()
+    entity = client.get_entity("batch", batch_id)
+    for key, amount in counters.items():
+        entity[key] = entity.get(key, 0) + amount
+    client.update_entity(entity, mode="merge")
+
+
+def get_batch(batch_id: str) -> dict | None:
+    try:
+        return dict(_batches_client().get_entity("batch", batch_id))
     except ResourceNotFoundError:
         return None

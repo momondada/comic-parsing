@@ -5,7 +5,34 @@ from urllib.parse import urlparse
 PRIMARY = re.compile(r"^(?P<comic>.+?)-chapter-(?P<chapter>\d+(?:\.\d+)?)(?:-.*)?$", re.I)
 CHAPTER_SEGMENT = re.compile(r"^chapter[-_]?(?P<chapter>\d+(?:\.\d+)?)$", re.I)
 CHAPTER_ANYWHERE = re.compile(r"chapter[-_/]?(?P<chapter>\d+(?:\.\d+)?)", re.I)
+TEMPLATE_PATTERN = re.compile(r"(chapter[-_]?)(\d+(?:\.\d+)?)", re.I)
 BOILERPLATE = {"reader", "en", "read", "manga", "comic", "comics", "series", "title"}
+
+
+def chapter_row_key(chapter: float | None) -> str:
+    if chapter is None:
+        return "000000"
+    return f"{round(chapter * 10):06d}"
+
+
+def format_chapter(chapter: float) -> str:
+    if chapter == int(chapter):
+        return str(int(chapter))
+    return str(chapter)
+
+
+def derive_url_template(url: str) -> str | None:
+    """Replace the chapter-number segment of a chapter URL with '{chapter}'.
+
+    Lets a batch job reconstruct other chapters' URLs for the same comic
+    (e.g. .../foo-chapter-84-eng-li/ -> .../foo-chapter-{chapter}-eng-li/).
+    Returns None if no confident chapter-number segment is found.
+    """
+    match = TEMPLATE_PATTERN.search(url)
+    if not match:
+        return None
+    start, end = match.span(2)
+    return url[:start] + "{chapter}" + url[end:]
 
 
 @dataclass
@@ -18,15 +45,11 @@ class ComicRef:
     def chapter_display(self) -> str:
         if self.chapter is None:
             return "unknown"
-        if self.chapter == int(self.chapter):
-            return str(int(self.chapter))
-        return str(self.chapter)
+        return format_chapter(self.chapter)
 
     @property
     def chapter_row_key(self) -> str:
-        if self.chapter is None:
-            return "000000"
-        return f"{round(self.chapter * 10):06d}"
+        return chapter_row_key(self.chapter)
 
 
 def parse_comic_slug(url: str) -> ComicRef:

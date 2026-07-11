@@ -10,14 +10,121 @@
   <h1>{{ comic }}</h1>
   <p><a href="/library">回到書櫃</a></p>
 
+  <h2>批次下載</h2>
+  <form id="batch-form">
+    <input type="number" id="batch-start" placeholder="起始話數" min="1" required />
+    <input type="number" id="batch-end" placeholder="結束話數" min="1" required />
+    <button type="submit" id="batch-btn">開始批次下載</button>
+  </form>
+  <div id="batch-status"></div>
+
+  <h2>章節列表</h2>
   <ul class="card-list">
     {% for chapter in chapters %}
-    <li>
+    <li class="chapter-row">
       <a href="/reader/{{ comic }}/{{ chapter.RowKey }}">
         第 {{ chapter.chapter_display }} 話（{{ chapter.page_count }} 頁）
       </a>
+      <span class="chapter-actions">
+        <button class="rescrape-btn" data-row-key="{{ chapter.RowKey }}">重新抓取</button>
+        <span class="rescrape-status"></span>
+      </span>
     </li>
     {% endfor %}
   </ul>
+
+  <script>
+    const comic = "{{ comic }}";
+
+    const batchForm = document.getElementById("batch-form");
+    const batchStatus = document.getElementById("batch-status");
+    const batchBtn = document.getElementById("batch-btn");
+    let batchTimer = null;
+
+    function pollBatch(batchId) {
+      batchTimer = setInterval(async () => {
+        const res = await fetch(`/api/batches/${batchId}`);
+        if (!res.ok) return;
+        const b = await res.json();
+
+        if (b.status === "pending" || b.status === "running") {
+          batchStatus.textContent = `處理中... 目前第 ${b.current_chapter} 話（完成 ${b.done}、跳過 ${b.skipped}、失敗 ${b.failed} / 共 ${b.total}）`;
+        } else if (b.status === "done") {
+          clearInterval(batchTimer);
+          batchBtn.disabled = false;
+          batchStatus.textContent = `批次完成！完成 ${b.done}、跳過 ${b.skipped}、失敗 ${b.failed} / 共 ${b.total}`;
+          setTimeout(() => location.reload(), 1500);
+        } else if (b.status === "failed") {
+          clearInterval(batchTimer);
+          batchBtn.disabled = false;
+          batchStatus.innerHTML = `<span class="error">${b.error}</span>`;
+        }
+      }, 2000);
+    }
+
+    batchForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const start = parseInt(document.getElementById("batch-start").value, 10);
+      const end = parseInt(document.getElementById("batch-end").value, 10);
+
+      batchBtn.disabled = true;
+      batchStatus.textContent = "已送出，開始批次處理...";
+
+      const res = await fetch(`/api/comics/${encodeURIComponent(comic)}/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start, end }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        batchStatus.innerHTML = `<span class="error">送出失敗：${err.detail || res.status}</span>`;
+        batchBtn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      pollBatch(data.batch_id);
+    });
+
+    document.querySelectorAll(".rescrape-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const rowKey = btn.dataset.rowKey;
+        const statusEl = btn.nextElementSibling;
+        btn.disabled = true;
+        statusEl.textContent = "重新抓取中...";
+
+        const res = await fetch(
+          `/api/chapters/${encodeURIComponent(comic)}/${rowKey}/rescrape`,
+          { method: "POST" }
+        );
+
+        if (!res.ok) {
+          statusEl.innerHTML = `<span class="error">送出失敗</span>`;
+          btn.disabled = false;
+          return;
+        }
+
+        const { job_id } = await res.json();
+        const timer = setInterval(async () => {
+          const r = await fetch(`/api/jobs/${job_id}`);
+          if (!r.ok) return;
+          const job = await r.json();
+
+          if (job.status === "done") {
+            clearInterval(timer);
+            statusEl.textContent = `完成（${job.page_count} 頁）`;
+            btn.disabled = false;
+          } else if (job.status === "failed") {
+            clearInterval(timer);
+            statusEl.innerHTML = `<span class="error">${job.error}</span>`;
+            btn.disabled = false;
+          } else {
+            statusEl.textContent = "重新抓取中...";
+          }
+        }, 2000);
+      });
+    });
+  </script>
 </body>
 </html>

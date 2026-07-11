@@ -16,3 +16,5 @@ if not STORAGE_CONNECTION_STRING and not STORAGE_ACCOUNT_NAME:
 BLOB_CONTAINER_NAME = os.environ.get("BLOB_CONTAINER_NAME", "comic-pages")
 JOBS_TABLE_NAME = os.environ.get("JOBS_TABLE_NAME", "jobs")
 CHAPTERS_TABLE_NAME = os.environ.get("CHAPTERS_TABLE_NAME", "chapters")
+COMICS_TABLE_NAME = os.environ.get("COMICS_TABLE_NAME", "comics")
+BATCHES_TABLE_NAME = os.environ.get("BATCHES_TABLE_NAME", "batches")

@@ -1,4 +1,4 @@
-from app.scraping.slug import parse_comic_slug
+from app.scraping.slug import chapter_row_key, derive_url_template, format_chapter, parse_comic_slug
 
 
 def test_mgeko_style_with_trailing_suffix():
@@ -51,3 +51,30 @@ def test_chapter_row_key_fixed_width_and_sortable():
         c.chapter_row_key,
         b.chapter_row_key,
     ]
+
+
+def test_derive_url_template_mgeko_style():
+    url = "https://www.mgeko.cc/reader/en/delusional-hunter-in-another-world-chapter-84-eng-li/"
+    template = derive_url_template(url)
+    assert template == (
+        "https://www.mgeko.cc/reader/en/"
+        "delusional-hunter-in-another-world-chapter-{chapter}-eng-li/"
+    )
+    assert template.replace("{chapter}", "50") == (
+        "https://www.mgeko.cc/reader/en/delusional-hunter-in-another-world-chapter-50-eng-li/"
+    )
+
+
+def test_derive_url_template_no_chapter_returns_none():
+    assert derive_url_template("https://example.com/some/random/page") is None
+
+
+def test_chapter_row_key_helper_matches_comicref_property():
+    ref = parse_comic_slug("https://example.com/foo-chapter-9.5/")
+    assert chapter_row_key(ref.chapter) == ref.chapter_row_key == "000095"
+    assert chapter_row_key(None) == "000000"
+
+
+def test_format_chapter_integer_vs_decimal():
+    assert format_chapter(50) == "50"
+    assert format_chapter(84.5) == "84.5"
