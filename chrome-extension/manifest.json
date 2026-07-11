@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Network File Grabber",
+  "version": "1.0.0",
+  "description": "監控網路流量，擷取檔名符合指定前綴的檔案，依擷取時間排序後下載",
+  "permissions": ["webRequest", "downloads", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
