@@ -110,15 +110,26 @@ body.reader-page {
 .bubble {
   position: absolute;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   background: rgba(0, 0, 0, 0.72);
   color: #fff;
-  font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.25;
   padding: 2px;
   border-radius: 4px;
   overflow: hidden;
   pointer-events: none;
+}
+
+.bubble-en {
+  font-size: 10px;
+  color: #cdd6e0;
+  font-style: italic;
+}
+
+.bubble-zh {
+  font-size: 12px;
+  font-weight: 600;
 }

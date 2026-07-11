@@ -41,7 +41,17 @@
           div.style.top = `${b.top_pct}%`;
           div.style.width = `${b.width_pct}%`;
           div.style.height = `${b.height_pct}%`;
-          div.textContent = b.text_zh;
+
+          const enEl = document.createElement("div");
+          enEl.className = "bubble-en";
+          enEl.textContent = b.text_en;
+
+          const zhEl = document.createElement("div");
+          zhEl.className = "bubble-zh";
+          zhEl.textContent = b.text_zh;
+
+          div.appendChild(enEl);
+          div.appendChild(zhEl);
           pageEl.appendChild(div);
         });
       });

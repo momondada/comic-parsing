@@ -12,10 +12,15 @@ TOKEN_SCOPE = "https://ai.azure.com/.default"
 SYSTEM_PROMPT = (
     "You are analyzing a single comic/manga page image. Identify every "
     "dialogue or speech bubble that contains English text. For each bubble, "
-    "translate the text into Traditional Chinese (zh-Hant) and estimate its "
-    "bounding box as percentages of the full image width/height, where "
-    "(0, 0) is the top-left corner. Respond with ONLY JSON, no markdown, "
-    'in this exact shape: {"bubbles": [{"text_zh": "...", "left_pct": 0.0, '
+    "return the original English text (text_en) and its Traditional Chinese "
+    "(zh-Hant) translation (text_zh). Comic lettering is conventionally "
+    "printed in ALL CAPS — for text_en, normalize it to natural sentence "
+    "case (e.g. \"THIS IS A BOOK.\" becomes \"This is a book.\"), preserving "
+    "any words that are genuinely acronyms, proper nouns, or emphasized in "
+    "the original. Also estimate each bubble's bounding box as percentages "
+    "of the full image width/height, where (0, 0) is the top-left corner. "
+    "Respond with ONLY JSON, no markdown, in this exact shape: "
+    '{"bubbles": [{"text_en": "...", "text_zh": "...", "left_pct": 0.0, '
     '"top_pct": 0.0, "width_pct": 0.0, "height_pct": 0.0}, ...]}. If there '
     'is no text on the page, respond with {"bubbles": []}.'
 )
@@ -25,6 +30,7 @@ _client = None
 
 @dataclass
 class Bubble:
+    text_en: str
     text_zh: str
     left_pct: float
     top_pct: float
@@ -71,6 +77,7 @@ def translate_page(image_bytes: bytes) -> list[Bubble]:
 
     return [
         Bubble(
+            text_en=b["text_en"],
             text_zh=b["text_zh"],
             left_pct=b["left_pct"],
             top_pct=b["top_pct"],
