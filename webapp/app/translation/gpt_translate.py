@@ -61,7 +61,15 @@ def translate_page(image_bytes: bytes) -> list[Bubble]:
                 ],
             }
         ],
-        max_output_tokens=4000,
+        # gpt-5.4-pro is a reasoning model — its (invisible) reasoning tokens
+        # count against max_output_tokens too, and a low budget can be
+        # entirely consumed by reasoning with zero room left for the actual
+        # answer (observed: 4000/4000 spent on reasoning, response
+        # "incomplete"). Low effort keeps this a perception+translation task
+        # rather than deep reasoning, and the higher budget leaves headroom
+        # for the real JSON answer on a busy page.
+        reasoning={"effort": "low"},
+        max_output_tokens=16000,
     )
 
     if not response.output_text:
