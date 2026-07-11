@@ -74,10 +74,12 @@ button:disabled { opacity: 0.6; cursor: default; }
   white-space: nowrap;
 }
 
-.rescrape-btn {
+.rescrape-btn,
+.translate-btn {
   padding: 6px 10px;
   font-size: 13px;
   margin-top: 0;
+  min-width: 72px;
 }
 
 body.reader-page {
