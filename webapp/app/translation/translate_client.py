@@ -7,20 +7,18 @@ MAX_BATCH_SIZE = 900  # service limit is 1000 elements per request
 
 
 def _make_translator_client() -> TextTranslationClient:
-    # A multi-service resource requires "region" for either auth mode, and
-    # additionally "resource_id" when authenticating with a token (Managed
-    # Identity) — without both, the service can't resolve which resource the
-    # request/token is for and returns 404, not 401/403.
+    # Use the default global endpoint (not the AIServices custom domain —
+    # that 404s for Translator specifically) with region + resource_id to
+    # identify the multi-service resource, per Translator's documented
+    # Entra ID auth pattern for multi-service resources.
     if config.AI_SERVICES_KEY:
         from azure.core.credentials import AzureKeyCredential
 
         return TextTranslationClient(
-            endpoint=config.AI_SERVICES_ENDPOINT,
             credential=AzureKeyCredential(config.AI_SERVICES_KEY),
             region=config.AI_SERVICES_REGION,
         )
     return TextTranslationClient(
-        endpoint=config.AI_SERVICES_ENDPOINT,
         credential=DefaultAzureCredential(),
         region=config.AI_SERVICES_REGION,
         resource_id=config.AI_SERVICES_RESOURCE_ID,
