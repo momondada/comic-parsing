@@ -64,6 +64,9 @@ def translate_page(image_bytes: bytes) -> list[Bubble]:
         max_output_tokens=4000,
     )
 
+    if not response.output_text:
+        print(f"[diagnostic] empty output_text, raw response: {response.model_dump_json()}", flush=True)
+
     data = json.loads(response.output_text)
 
     return [
