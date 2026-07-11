@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ comic }} - Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>{{ comic }}</h1>
+  <p><a href="/library">回到書櫃</a></p>
+
+  <ul class="card-list">
+    {% for chapter in chapters %}
+    <li>
+      <a href="/reader/{{ comic }}/{{ chapter.RowKey }}">
+        第 {{ chapter.chapter_display }} 話（{{ chapter.page_count }} 頁）
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

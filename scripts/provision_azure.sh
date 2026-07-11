@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# One-time Azure provisioning for the comic-parsing webapp.
+# Run this in Azure Cloud Shell (https://shell.azure.com) or any machine with
+# the az CLI logged in (`az login`). Safe to re-run — every step is idempotent.
+set -euo pipefail
+
+# ---- Edit these before running ----
+RESOURCE_GROUP="comic-parsing-rg"
+LOCATION="eastasia"
+STORAGE_ACCOUNT="comicparsingstorage"   # must be globally unique, lowercase, 3-24 chars, no hyphens
+APP_SERVICE_PLAN="comic-parsing-plan"
+WEBAPP_NAME="comic-parsing-app"          # must be globally unique, becomes <name>.azurewebsites.net
+BLOB_CONTAINER="comic-pages"
+# ------------------------------------
+
+echo "==> Creating resource group..."
+az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
+
+echo "==> Creating storage account..."
+az storage account create \
+  --name "$STORAGE_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --location "$LOCATION" \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --output none
+
+CONNECTION_STRING=$(az storage account show-connection-string \
+  --name "$STORAGE_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --output tsv)
+
+echo "==> Creating blob container and tables..."
+az storage container create \
+  --name "$BLOB_CONTAINER" \
+  --connection-string "$CONNECTION_STRING" \
+  --output none
+
+az storage table create --name jobs --connection-string "$CONNECTION_STRING" --output none
+az storage table create --name chapters --connection-string "$CONNECTION_STRING" --output none
+
+echo "==> Creating App Service plan (Linux, B1)..."
+az appservice plan create \
+  --name "$APP_SERVICE_PLAN" \
+  --resource-group "$RESOURCE_GROUP" \
+  --location "$LOCATION" \
+  --is-linux \
+  --sku B1 \
+  --output none
+
+echo "==> Creating Web App (placeholder image, GitHub Actions will deploy the real one)..."
+az webapp create \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --plan "$APP_SERVICE_PLAN" \
+  --deployment-container-image-name "mcr.microsoft.com/appsvc/staticsite:latest" \
+  --output none
+
+echo "==> Configuring app settings and Always On..."
+az webapp config appsettings set \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --settings \
+    AZURE_STORAGE_CONNECTION_STRING="$CONNECTION_STRING" \
+    BLOB_CONTAINER_NAME="$BLOB_CONTAINER" \
+    WEBSITES_PORT=8000 \
+    WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
+  --output none
+
+az webapp config set \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --always-on true \
+  --output none
+
+echo "==> Fetching publish profile (needed as a GitHub secret)..."
+az webapp deployment list-publishing-profiles \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --xml > publish_profile.xml
+
+cat <<EOF
+
+Done. Next steps:
+
+1. In the GitHub repo (momondada/comic-parsing) go to
+   Settings -> Secrets and variables -> Actions, and add a secret named
+   AZURE_WEBAPP_PUBLISH_PROFILE with the contents of ./publish_profile.xml
+   (then delete that local file — it grants deploy access to the app).
+
+2. In the same repo, go to Settings -> Secrets and variables -> Actions ->
+   Variables tab, and add a repository VARIABLE (not secret) named
+   AZURE_WEBAPP_NAME with the value:
+   $WEBAPP_NAME
+
+3. Push to main (touching anything under webapp/) to trigger the deploy
+   workflow, which builds the image, pushes it to GHCR, and points this
+   Web App at it. The first run will push a new GHCR package
+   (ghcr.io/<owner>/comic-parsing-webapp) as private by default — go to that
+   package's settings on GitHub and change its visibility to Public, so the
+   Web App can pull it without registry credentials.
+
+4. Once deployed, visit https://$WEBAPP_NAME.azurewebsites.net
+EOF

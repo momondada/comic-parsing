@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的書櫃 - Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>我的書櫃</h1>
+  <p><a href="/">回到下載頁面</a></p>
+
+  {% if comics %}
+  <ul class="card-list">
+    {% for comic in comics %}
+    <li><a href="/library/{{ comic }}">{{ comic }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>還沒有任何漫畫，去下載一話吧。</p>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.azurite/
+azurite.log
+.pytest_cache/

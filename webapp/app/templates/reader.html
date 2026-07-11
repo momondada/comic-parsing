@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ comic }} 第{{ chapter_display }}話 - Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="reader-page">
+  <div class="reader-nav">
+    <a href="/library/{{ comic }}">{{ comic }} - 第 {{ chapter_display }} 話</a>
+  </div>
+  <div class="reader">
+    {% for filename in filenames %}
+    <img src="/media/{{ comic }}/{{ chapter_row_key }}/{{ filename }}" loading="lazy" alt="page {{ loop.index }}" />
+    {% endfor %}
+  </div>
+  <div class="reader-nav">
+    <a href="/library/{{ comic }}">回到章節列表</a>
+  </div>
+</body>
+</html>

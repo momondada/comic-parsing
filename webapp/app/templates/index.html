@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>下載漫畫章節</h1>
+  <p><a href="/library">前往我的書櫃</a></p>
+
+  <form id="submit-form">
+    <input type="text" id="url" name="url" placeholder="貼上漫畫章節網址" required />
+    <button type="submit" id="submit-btn">開始下載</button>
+  </form>
+
+  <div id="status"></div>
+
+  <script>
+    const form = document.getElementById("submit-form");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    let pollTimer = null;
+
+    function poll(jobId) {
+      pollTimer = setInterval(async () => {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) return;
+        const job = await res.json();
+
+        if (job.status === "pending" || job.status === "running") {
+          statusEl.textContent = `處理中... (${job.comic || "解析中"} 第 ${job.chapter || "?"} 話)`;
+        } else if (job.status === "done") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `完成！共 ${job.page_count} 頁。<a href="/reader/${job.comic}/${job.chapter_row_key}">立即閱讀</a>`;
+        } else if (job.status === "failed") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `<span class="error">失敗：${job.error}</span>`;
+        }
+      }, 2000);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const url = document.getElementById("url").value.trim();
+      if (!url) return;
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "已送出，開始處理...";
+
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!res.ok) {
+        statusEl.innerHTML = `<span class="error">送出失敗</span>`;
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      poll(data.job_id);
+    });
+  </script>
+</body>
+</html>
