@@ -1,14 +1,13 @@
 import base64
 import json
-
-from azure.identity import DefaultAzureCredential
 from dataclasses import dataclass
-from openai import AzureOpenAI
+
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from openai import OpenAI
 
 from .. import config
 
-API_VERSION = "2025-04-01-preview"
-TOKEN_SCOPE = "https://cognitiveservices.azure.com/.default"
+TOKEN_SCOPE = "https://ai.azure.com/.default"
 
 SYSTEM_PROMPT = (
     "You are analyzing a single comic/manga page image. Identify every "
@@ -21,7 +20,7 @@ SYSTEM_PROMPT = (
     'is no text on the page, respond with {"bubbles": []}.'
 )
 
-_credential = None
+_client = None
 
 
 @dataclass
@@ -33,22 +32,15 @@ class Bubble:
     height_pct: float
 
 
-def _get_client() -> AzureOpenAI:
-    global _credential
-    if config.AI_SERVICES_KEY:
-        return AzureOpenAI(
-            api_key=config.AI_SERVICES_KEY,
-            api_version=API_VERSION,
-            azure_endpoint=config.AI_SERVICES_ENDPOINT,
-        )
-    if _credential is None:
-        _credential = DefaultAzureCredential()
-    token = _credential.get_token(TOKEN_SCOPE).token
-    return AzureOpenAI(
-        azure_ad_token=token,
-        api_version=API_VERSION,
-        azure_endpoint=config.AI_SERVICES_ENDPOINT,
-    )
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        if config.AI_SERVICES_KEY:
+            _client = OpenAI(base_url=config.AI_SERVICES_ENDPOINT, api_key=config.AI_SERVICES_KEY)
+        else:
+            token_provider = get_bearer_token_provider(DefaultAzureCredential(), TOKEN_SCOPE)
+            _client = OpenAI(base_url=config.AI_SERVICES_ENDPOINT, api_key=token_provider)
+    return _client
 
 
 def translate_page(image_bytes: bytes) -> list[Bubble]:
