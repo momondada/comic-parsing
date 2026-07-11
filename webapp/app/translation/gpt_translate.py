@@ -6,18 +6,23 @@ from openai import OpenAI
 from .. import config
 
 TOKEN_SCOPE = "https://ai.azure.com/.default"
-CHUNK_SIZE = 150
+CHUNK_SIZE = 40
 
 INSTRUCTIONS = (
-    "You will receive a JSON array of raw OCR-extracted comic dialogue "
-    "lines. Comic lettering is conventionally printed in ALL CAPS. For "
-    "each input string, return: (1) text_en: the same text normalized to "
-    'natural sentence case (e.g. "THIS IS A BOOK." becomes "This is a '
-    'book."), preserving genuine acronyms, proper nouns, or emphasis from '
-    "the original, and (2) text_zh: its Traditional Chinese (zh-Hant) "
-    "translation. Respond with ONLY JSON, no markdown, in this exact "
-    'shape: {"items": [{"text_en": "...", "text_zh": "..."}, ...]}, with '
-    "exactly one item per input string, in the same order as the input."
+    "You will receive a JSON array of objects, each with an integer id and "
+    "raw OCR-extracted comic dialogue text. Comic lettering is "
+    "conventionally printed in ALL CAPS. For each object, return: (1) "
+    "text_en: the same text normalized to natural sentence case (e.g. "
+    '"THIS IS A BOOK." becomes "This is a book."), preserving genuine '
+    "acronyms, proper nouns, or emphasis from the original (if the source "
+    "text is not English, leave text_en as the original text unchanged), "
+    "and (2) text_zh: its Traditional Chinese (zh-Hant) translation. "
+    "Respond with ONLY JSON, no markdown, in this exact shape: "
+    '{"items": [{"id": 0, "text_en": "...", "text_zh": "..."}, ...]}. '
+    "You MUST include the same id from the input on every output item — "
+    "this is how results get matched back to their source text, so a "
+    "missing or wrong id will corrupt the result. Include every id "
+    "exactly once; order doesn't matter."
 )
 
 _client = None
@@ -34,13 +39,14 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def _translate_chunk(texts: list[str]) -> list[tuple[str, str]]:
+def _translate_chunk(items: list[tuple[int, str]]) -> dict[int, tuple[str, str]]:
     client = _get_client()
+    payload = [{"id": i, "text": text} for i, text in items]
     response = client.responses.create(
         model=config.AZURE_OPENAI_DEPLOYMENT,
         instructions=INSTRUCTIONS,
-        input=json.dumps(texts, ensure_ascii=False),
-        max_output_tokens=8000,
+        input=json.dumps(payload, ensure_ascii=False),
+        max_output_tokens=4000,
     )
 
     if not response.output_text:
@@ -50,7 +56,7 @@ def _translate_chunk(texts: list[str]) -> list[tuple[str, str]]:
         )
 
     data = json.loads(response.output_text)
-    return [(item["text_en"], item["text_zh"]) for item in data["items"]]
+    return {entry["id"]: (entry["text_en"], entry["text_zh"]) for entry in data["items"]}
 
 
 def normalize_and_translate(texts: list[str]) -> list[tuple[str, str]]:
@@ -58,11 +64,18 @@ def normalize_and_translate(texts: list[str]) -> list[tuple[str, str]]:
 
     Pure text in/out — no image involved, so this doesn't depend on a
     vision model's ability to also localize bubbles (that's OCR's job).
+    Results are matched back to their input by an explicit id rather than
+    assuming the model preserves array order/count, since a chapter can
+    have 100+ bubbles and a positional mismatch silently corrupts every
+    bubble after the first dropped/reordered one.
     """
     if not texts:
         return []
 
-    results: list[tuple[str, str]] = []
-    for start in range(0, len(texts), CHUNK_SIZE):
-        results.extend(_translate_chunk(texts[start : start + CHUNK_SIZE]))
-    return results
+    indexed = list(enumerate(texts))
+    by_id: dict[int, tuple[str, str]] = {}
+
+    for start in range(0, len(indexed), CHUNK_SIZE):
+        by_id.update(_translate_chunk(indexed[start : start + CHUNK_SIZE]))
+
+    return [by_id.get(i, (text, text)) for i, text in indexed]
