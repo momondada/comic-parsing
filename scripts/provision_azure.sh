@@ -83,7 +83,7 @@ az role assignment create \
   --scope "$STORAGE_ACCOUNT_ID" \
   --output none
 
-echo "==> Creating Azure AI services resource (OCR + Translator, one endpoint)..."
+echo "==> Creating Azure AI services resource (hosts the GPT-4o deployment)..."
 # If this tenant's policy also blocks public network access on this resource
 # (as it did for Storage), the app will fail to reach it and the same fix
 # applies: add a Private Endpoint (subresource "account") on comic-parsing-vnet
@@ -111,9 +111,13 @@ echo "==> Granting the Web App's identity access to the AI services resource..."
 az role assignment create \
   --assignee-object-id "$PRINCIPAL_ID" \
   --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services User" \
+  --role "Cognitive Services OpenAI User" \
   --scope "$AI_SERVICES_ID" \
   --output none
+
+echo "==> Now deploy a gpt-4o model onto this resource in Azure AI Foundry"
+echo "    (portal.azure.com -> comic-parsing-ai -> Model deployments), then"
+echo "    re-run/continue to set the app settings below with its deployment name."
 
 echo "==> Configuring app settings and Always On..."
 az webapp config appsettings set \
@@ -123,8 +127,7 @@ az webapp config appsettings set \
     AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT" \
     BLOB_CONTAINER_NAME="$BLOB_CONTAINER" \
     AZURE_AI_SERVICES_ENDPOINT="$AI_SERVICES_ENDPOINT" \
-    AZURE_AI_SERVICES_REGION="$LOCATION" \
-    AZURE_AI_SERVICES_RESOURCE_ID="$AI_SERVICES_ID" \
+    AZURE_OPENAI_DEPLOYMENT="gpt-4o" \
     WEBSITES_PORT=8000 \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
   --output none

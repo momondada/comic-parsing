@@ -30,9 +30,4 @@ AI_SERVICES_ENDPOINT = (
     _ai_services_endpoint_raw.rstrip("/") if _ai_services_endpoint_raw else None
 )
 AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
-# Required for the Translator API specifically when authenticating with a
-# token (Managed Identity) against a multi-service resource's own endpoint —
-# the service uses these to resolve which resource the token is for.
-AI_SERVICES_REGION = os.environ.get("AZURE_AI_SERVICES_REGION")
-AI_SERVICES_RESOURCE_ID = os.environ.get("AZURE_AI_SERVICES_RESOURCE_ID")
-TRANSLATE_TARGET_LANGUAGE = os.environ.get("TRANSLATE_TARGET_LANGUAGE", "zh-Hant")
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
