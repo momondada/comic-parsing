@@ -23,7 +23,12 @@ BATCHES_TABLE_NAME = os.environ.get("BATCHES_TABLE_NAME", "batches")
 # AI_SERVICES_KEY (optional) lets local dev hit a real resource with a key;
 # on Azure this is left unset and DefaultAzureCredential (Managed Identity)
 # is used instead, matching the storage auth pattern above.
-AI_SERVICES_ENDPOINT = os.environ.get("AZURE_AI_SERVICES_ENDPOINT")
+_ai_services_endpoint_raw = os.environ.get("AZURE_AI_SERVICES_ENDPOINT")
+# Strip any trailing slash: the SDKs append their own path (e.g.
+# /translator/text/v...), and a double slash in that join 404s at the gateway.
+AI_SERVICES_ENDPOINT = (
+    _ai_services_endpoint_raw.rstrip("/") if _ai_services_endpoint_raw else None
+)
 AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
 # Required for the Translator API specifically when authenticating with a
 # token (Managed Identity) against a multi-service resource's own endpoint —
