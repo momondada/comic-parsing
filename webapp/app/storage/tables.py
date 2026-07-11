@@ -124,6 +124,18 @@ def get_chapter(comic: str, chapter_row_key: str) -> dict | None:
         return None
 
 
+def mark_chapter_translated(comic: str, chapter_row_key: str) -> None:
+    _chapters_client().update_entity(
+        {
+            "PartitionKey": comic,
+            "RowKey": chapter_row_key,
+            "translated": True,
+            "translated_at": _now(),
+        },
+        mode="merge",
+    )
+
+
 def upsert_comic_template(comic: str, url_template: str) -> None:
     _comics_client().upsert_entity(
         {"PartitionKey": "comic", "RowKey": comic, "url_template": url_template}

@@ -9,14 +9,60 @@
 <body class="reader-page">
   <div class="reader-nav">
     <a href="/library/{{ comic }}">{{ comic }} - 第 {{ chapter_display }} 話</a>
+    <button id="translate-toggle" class="rescrape-btn" style="display:none;">隱藏翻譯</button>
   </div>
   <div class="reader">
     {% for filename in filenames %}
-    <img src="/media/{{ comic }}/{{ chapter_row_key }}/{{ filename }}" loading="lazy" alt="page {{ loop.index }}" />
+    <div class="page" data-filename="{{ filename }}">
+      <img src="/media/{{ comic }}/{{ chapter_row_key }}/{{ filename }}" loading="lazy" alt="page {{ loop.index }}" />
+    </div>
     {% endfor %}
   </div>
   <div class="reader-nav">
     <a href="/library/{{ comic }}">回到章節列表</a>
   </div>
+
+  <script>
+    const comic = "{{ comic }}";
+    const chapterRowKey = "{{ chapter_row_key }}";
+    const toggleBtn = document.getElementById("translate-toggle");
+    let translationsVisible = true;
+
+    function renderBubbles(pages) {
+      document.querySelectorAll(".page").forEach((pageEl) => {
+        const filename = pageEl.dataset.filename;
+        const bubbles = pages[filename];
+        if (!bubbles || bubbles.length === 0) return;
+
+        bubbles.forEach((b) => {
+          const div = document.createElement("div");
+          div.className = "bubble";
+          div.style.left = `${b.left_pct}%`;
+          div.style.top = `${b.top_pct}%`;
+          div.style.width = `${b.width_pct}%`;
+          div.style.height = `${b.height_pct}%`;
+          div.textContent = b.text_zh;
+          pageEl.appendChild(div);
+        });
+      });
+
+      toggleBtn.style.display = "inline-block";
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      translationsVisible = !translationsVisible;
+      document.querySelectorAll(".bubble").forEach((el) => {
+        el.style.display = translationsVisible ? "flex" : "none";
+      });
+      toggleBtn.textContent = translationsVisible ? "隱藏翻譯" : "顯示翻譯";
+    });
+
+    fetch(`/api/chapters/${encodeURIComponent(comic)}/${chapterRowKey}/translations`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.pages) renderBubbles(data.pages);
+      })
+      .catch(() => {});
+  </script>
 </body>
 </html>

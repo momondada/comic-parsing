@@ -1,3 +1,6 @@
+import json
+
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
@@ -45,3 +48,22 @@ def list_page_filenames(comic: str, chapter_row_key: str) -> list[str]:
 def download_page(comic: str, chapter_row_key: str, filename: str) -> bytes:
     blob_name = f"{comic}/{chapter_row_key}/{filename}"
     return _container().download_blob(blob_name).readall()
+
+
+def upload_chapter_translations(comic: str, chapter_row_key: str, data: dict) -> None:
+    blob_name = f"{comic}/{chapter_row_key}/translations.json"
+    _container().upload_blob(
+        blob_name,
+        json.dumps(data).encode("utf-8"),
+        overwrite=True,
+        content_type="application/json",
+    )
+
+
+def download_chapter_translations(comic: str, chapter_row_key: str) -> dict | None:
+    blob_name = f"{comic}/{chapter_row_key}/translations.json"
+    try:
+        raw = _container().download_blob(blob_name).readall()
+    except ResourceNotFoundError:
+        return None
+    return json.loads(raw)

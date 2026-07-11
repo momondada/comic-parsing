@@ -28,6 +28,10 @@
       <span class="chapter-actions">
         <button class="rescrape-btn" data-row-key="{{ chapter.RowKey }}">重新抓取</button>
         <span class="rescrape-status"></span>
+        <button class="translate-btn" data-row-key="{{ chapter.RowKey }}">
+          {{ "重新翻譯" if chapter.translated else "翻譯" }}
+        </button>
+        <span class="translate-status"></span>
       </span>
     </li>
     {% endfor %}
@@ -121,6 +125,46 @@
             btn.disabled = false;
           } else {
             statusEl.textContent = "重新抓取中...";
+          }
+        }, 2000);
+      });
+    });
+
+    document.querySelectorAll(".translate-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const rowKey = btn.dataset.rowKey;
+        const statusEl = btn.nextElementSibling;
+        btn.disabled = true;
+        statusEl.textContent = "翻譯中...";
+
+        const res = await fetch(
+          `/api/chapters/${encodeURIComponent(comic)}/${rowKey}/translate`,
+          { method: "POST" }
+        );
+
+        if (!res.ok) {
+          statusEl.innerHTML = `<span class="error">送出失敗</span>`;
+          btn.disabled = false;
+          return;
+        }
+
+        const { job_id } = await res.json();
+        const timer = setInterval(async () => {
+          const r = await fetch(`/api/jobs/${job_id}`);
+          if (!r.ok) return;
+          const job = await r.json();
+
+          if (job.status === "done") {
+            clearInterval(timer);
+            statusEl.textContent = "翻譯完成";
+            btn.textContent = "重新翻譯";
+            btn.disabled = false;
+          } else if (job.status === "failed") {
+            clearInterval(timer);
+            statusEl.innerHTML = `<span class="error">${job.error}</span>`;
+            btn.disabled = false;
+          } else {
+            statusEl.textContent = "翻譯中...";
           }
         }, 2000);
       });

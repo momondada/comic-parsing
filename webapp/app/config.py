@@ -18,3 +18,11 @@ JOBS_TABLE_NAME = os.environ.get("JOBS_TABLE_NAME", "jobs")
 CHAPTERS_TABLE_NAME = os.environ.get("CHAPTERS_TABLE_NAME", "chapters")
 COMICS_TABLE_NAME = os.environ.get("COMICS_TABLE_NAME", "comics")
 BATCHES_TABLE_NAME = os.environ.get("BATCHES_TABLE_NAME", "batches")
+
+# Translation overlay: no local emulator exists for Cognitive Services, so
+# AI_SERVICES_KEY (optional) lets local dev hit a real resource with a key;
+# on Azure this is left unset and DefaultAzureCredential (Managed Identity)
+# is used instead, matching the storage auth pattern above.
+AI_SERVICES_ENDPOINT = os.environ.get("AZURE_AI_SERVICES_ENDPOINT")
+AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
+TRANSLATE_TARGET_LANGUAGE = os.environ.get("TRANSLATE_TARGET_LANGUAGE", "zh-Hant")

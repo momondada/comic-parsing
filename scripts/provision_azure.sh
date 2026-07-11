@@ -15,6 +15,7 @@ STORAGE_ACCOUNT="comicparsestorage"   # must be globally unique, lowercase, 3-24
 APP_SERVICE_PLAN="comic-parsing-plan"
 WEBAPP_NAME="comic-parsing-app"          # must be globally unique
 BLOB_CONTAINER="comic-pages"
+AI_SERVICES_NAME="comic-parsing-ai"       # must be globally unique
 # ------------------------------------
 
 echo "==> Creating resource group..."
@@ -82,6 +83,38 @@ az role assignment create \
   --scope "$STORAGE_ACCOUNT_ID" \
   --output none
 
+echo "==> Creating Azure AI services resource (OCR + Translator, one endpoint)..."
+# If this tenant's policy also blocks public network access on this resource
+# (as it did for Storage), the app will fail to reach it and the same fix
+# applies: add a Private Endpoint (subresource "account") on comic-parsing-vnet
+# + link the privatelink.cognitiveservices.azure.com DNS zone, same as Storage.
+az cognitiveservices account create \
+  --name "$AI_SERVICES_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --location "$LOCATION" \
+  --kind AIServices \
+  --sku S0 \
+  --yes \
+  --output none
+
+AI_SERVICES_ID=$(az cognitiveservices account show \
+  --name "$AI_SERVICES_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query id --output tsv)
+
+AI_SERVICES_ENDPOINT=$(az cognitiveservices account show \
+  --name "$AI_SERVICES_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query properties.endpoint --output tsv)
+
+echo "==> Granting the Web App's identity access to the AI services resource..."
+az role assignment create \
+  --assignee-object-id "$PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services User" \
+  --scope "$AI_SERVICES_ID" \
+  --output none
+
 echo "==> Configuring app settings and Always On..."
 az webapp config appsettings set \
   --name "$WEBAPP_NAME" \
@@ -89,6 +122,7 @@ az webapp config appsettings set \
   --settings \
     AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT" \
     BLOB_CONTAINER_NAME="$BLOB_CONTAINER" \
+    AZURE_AI_SERVICES_ENDPOINT="$AI_SERVICES_ENDPOINT" \
     WEBSITES_PORT=8000 \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
   --output none
