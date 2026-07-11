@@ -2,14 +2,18 @@
 # One-time Azure provisioning for the comic-parsing webapp.
 # Run this in Azure Cloud Shell (https://shell.azure.com) or any machine with
 # the az CLI logged in (`az login`). Safe to re-run — every step is idempotent.
+#
+# Uses Managed Identity (not storage account keys) throughout: some tenants
+# enforce "Key based authentication is not permitted on this storage account"
+# via policy, so this avoids depending on key access being allowed at all.
 set -euo pipefail
 
 # ---- Edit these before running ----
 RESOURCE_GROUP="comic-parsing-rg"
 LOCATION="eastasia"
-STORAGE_ACCOUNT="comicparsingstorage"   # must be globally unique, lowercase, 3-24 chars, no hyphens
+STORAGE_ACCOUNT="comicparsestorage"   # must be globally unique, lowercase, 3-24 chars, no hyphens
 APP_SERVICE_PLAN="comic-parsing-plan"
-WEBAPP_NAME="comic-parsing-app"          # must be globally unique, becomes <name>.azurewebsites.net
+WEBAPP_NAME="comic-parsing-app"          # must be globally unique
 BLOB_CONTAINER="comic-pages"
 # ------------------------------------
 
@@ -25,19 +29,20 @@ az storage account create \
   --kind StorageV2 \
   --output none
 
-CONNECTION_STRING=$(az storage account show-connection-string \
+STORAGE_ACCOUNT_ID=$(az storage account show \
   --name "$STORAGE_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
-  --output tsv)
+  --query id --output tsv)
 
-echo "==> Creating blob container and tables..."
+echo "==> Creating blob container and tables (using your own az login, not account keys)..."
 az storage container create \
   --name "$BLOB_CONTAINER" \
-  --connection-string "$CONNECTION_STRING" \
+  --account-name "$STORAGE_ACCOUNT" \
+  --auth-mode login \
   --output none
 
-az storage table create --name jobs --connection-string "$CONNECTION_STRING" --output none
-az storage table create --name chapters --connection-string "$CONNECTION_STRING" --output none
+az storage table create --name jobs --account-name "$STORAGE_ACCOUNT" --auth-mode login --output none
+az storage table create --name chapters --account-name "$STORAGE_ACCOUNT" --auth-mode login --output none
 
 echo "==> Creating App Service plan (Linux, B1)..."
 az appservice plan create \
@@ -56,12 +61,33 @@ az webapp create \
   --deployment-container-image-name "mcr.microsoft.com/appsvc/staticsite:latest" \
   --output none
 
+echo "==> Enabling system-assigned Managed Identity on the Web App..."
+PRINCIPAL_ID=$(az webapp identity assign \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query principalId --output tsv)
+
+echo "==> Granting that identity access to the storage account..."
+az role assignment create \
+  --assignee-object-id "$PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Storage Blob Data Contributor" \
+  --scope "$STORAGE_ACCOUNT_ID" \
+  --output none
+
+az role assignment create \
+  --assignee-object-id "$PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Storage Table Data Contributor" \
+  --scope "$STORAGE_ACCOUNT_ID" \
+  --output none
+
 echo "==> Configuring app settings and Always On..."
 az webapp config appsettings set \
   --name "$WEBAPP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --settings \
-    AZURE_STORAGE_CONNECTION_STRING="$CONNECTION_STRING" \
+    AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT" \
     BLOB_CONTAINER_NAME="$BLOB_CONTAINER" \
     WEBSITES_PORT=8000 \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
@@ -74,6 +100,7 @@ az webapp config set \
   --output none
 
 echo "==> Fetching publish profile (needed as a GitHub secret)..."
+echo "    (requires SCM Basic Auth Publishing Credentials = On for this Web App)"
 az webapp deployment list-publishing-profiles \
   --name "$WEBAPP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
@@ -100,5 +127,7 @@ Done. Next steps:
    package's settings on GitHub and change its visibility to Public, so the
    Web App can pull it without registry credentials.
 
-4. Once deployed, visit https://$WEBAPP_NAME.azurewebsites.net
+4. Once deployed, visit the Web App's Default domain shown on its Overview
+   page in the Azure Portal (newer subscriptions get a random-suffixed
+   hostname, not just https://$WEBAPP_NAME.azurewebsites.net).
 EOF

@@ -7,3 +7,4 @@ playwright==1.57.0
 pillow==11.1.0
 azure-storage-blob==12.24.0
 azure-data-tables==12.5.0
+azure-identity==1.19.0

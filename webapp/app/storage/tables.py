@@ -2,10 +2,19 @@ from datetime import datetime, timezone
 
 from azure.core.exceptions import ResourceNotFoundError
 from azure.data.tables import TableServiceClient
+from azure.identity import DefaultAzureCredential
 
 from .. import config
 
-_service_client = TableServiceClient.from_connection_string(config.STORAGE_CONNECTION_STRING)
+
+def _make_client() -> TableServiceClient:
+    if config.STORAGE_CONNECTION_STRING:
+        return TableServiceClient.from_connection_string(config.STORAGE_CONNECTION_STRING)
+    account_url = f"https://{config.STORAGE_ACCOUNT_NAME}.table.core.windows.net"
+    return TableServiceClient(account_url, credential=DefaultAzureCredential())
+
+
+_service_client = _make_client()
 
 
 def ensure_tables() -> None:

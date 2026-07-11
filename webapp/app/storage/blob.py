@@ -1,9 +1,18 @@
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
 from .. import config
 from ..scraping.capture import CapturedImage
 
-_service_client = BlobServiceClient.from_connection_string(config.STORAGE_CONNECTION_STRING)
+
+def _make_client() -> BlobServiceClient:
+    if config.STORAGE_CONNECTION_STRING:
+        return BlobServiceClient.from_connection_string(config.STORAGE_CONNECTION_STRING)
+    account_url = f"https://{config.STORAGE_ACCOUNT_NAME}.blob.core.windows.net"
+    return BlobServiceClient(account_url, credential=DefaultAzureCredential())
+
+
+_service_client = _make_client()
 
 
 def ensure_container() -> None:
