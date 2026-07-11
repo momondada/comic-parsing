@@ -18,7 +18,13 @@ def _ocr_page(comic: str, chapter_row_key: str, filename: str):
     with Image.open(BytesIO(body)) as img:
         width, height = img.size
     lines = read_lines(body)
+    heights = [round(l.max_y - l.min_y) for l in lines]
     bubbles = merge_lines_into_bubbles(lines, width, height)
+    print(
+        f"[diagnostic] {filename}: {len(lines)} raw OCR lines "
+        f"(heights={heights}) -> {len(bubbles)} merged bubbles",
+        flush=True,
+    )
     return filename, bubbles
 
 
