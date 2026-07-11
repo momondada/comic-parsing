@@ -1,38 +1,42 @@
-from azure.ai.translation.text import TextTranslationClient
+import requests
 from azure.identity import DefaultAzureCredential
 
 from .. import config
 
 MAX_BATCH_SIZE = 900  # service limit is 1000 elements per request
+TOKEN_SCOPE = "https://cognitiveservices.azure.com/.default"
+GLOBAL_ENDPOINT = "https://api.cognitive.microsofttranslator.com/translate"
+
+_credential = None
 
 
-def _make_translator_client() -> TextTranslationClient:
-    # Use the default global endpoint (not the AIServices custom domain —
-    # that 404s for Translator specifically) with region + resource_id to
-    # identify the multi-service resource, per Translator's documented
-    # Entra ID auth pattern for multi-service resources.
+def _get_token() -> str:
+    global _credential
+    if _credential is None:
+        _credential = DefaultAzureCredential()
+    return _credential.get_token(TOKEN_SCOPE).token
+
+
+def _translate_chunk(chunk: list[str], target: str) -> list[str]:
+    headers = {"Content-Type": "application/json"}
+
     if config.AI_SERVICES_KEY:
-        from azure.core.credentials import AzureKeyCredential
+        headers["Ocp-Apim-Subscription-Key"] = config.AI_SERVICES_KEY
+        headers["Ocp-Apim-Subscription-Region"] = config.AI_SERVICES_REGION
+    else:
+        headers["Authorization"] = f"Bearer {_get_token()}"
+        headers["Ocp-Apim-ResourceId"] = config.AI_SERVICES_RESOURCE_ID
+        headers["Ocp-Apim-Subscription-Region"] = config.AI_SERVICES_REGION
 
-        return TextTranslationClient(
-            credential=AzureKeyCredential(config.AI_SERVICES_KEY),
-            region=config.AI_SERVICES_REGION,
-        )
-    return TextTranslationClient(
-        credential=DefaultAzureCredential(),
-        region=config.AI_SERVICES_REGION,
-        resource_id=config.AI_SERVICES_RESOURCE_ID,
+    response = requests.post(
+        GLOBAL_ENDPOINT,
+        params={"api-version": "3.0", "to": target},
+        headers=headers,
+        json=[{"text": text} for text in chunk],
+        timeout=30,
     )
-
-
-_client = None
-
-
-def _get_client() -> TextTranslationClient:
-    global _client
-    if _client is None:
-        _client = _make_translator_client()
-    return _client
+    response.raise_for_status()
+    return [item["translations"][0]["text"] for item in response.json()]
 
 
 def translate_texts(texts: list[str], to_language: str | None = None) -> list[str]:
@@ -40,12 +44,10 @@ def translate_texts(texts: list[str], to_language: str | None = None) -> list[st
         return []
 
     target = to_language or config.TRANSLATE_TARGET_LANGUAGE
-    client = _get_client()
     results: list[str] = []
 
     for start in range(0, len(texts), MAX_BATCH_SIZE):
         chunk = texts[start : start + MAX_BATCH_SIZE]
-        response = client.translate(body=chunk, to_language=[target])
-        results.extend(item.translations[0].text for item in response)
+        results.extend(_translate_chunk(chunk, target))
 
     return results
