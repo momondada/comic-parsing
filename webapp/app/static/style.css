@@ -85,14 +85,20 @@ body.reader-page {
   max-width: 100%;
 }
 
-/* Reader: single column, full-width, stacked vertically for thumb scrolling */
+/* Reader: single column, stacked vertically for thumb scrolling. Capped at a
+   phone-like width and centered so it also reads correctly on a wide desktop
+   browser instead of stretching full-bleed across the whole window. */
 .reader img {
   width: 100%;
   display: block;
   margin: 0;
 }
 
-.reader { max-width: 100%; padding: 0; margin: 0; }
+.reader {
+  max-width: 480px;
+  margin-inline: auto;
+  padding: 0;
+}
 
 .reader-nav {
   padding: 12px 16px;
