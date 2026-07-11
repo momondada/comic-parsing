@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 
 from ..jobs.translate_pipeline import run_translate
 from ..storage import blob, tables
@@ -20,8 +20,11 @@ def submit_translation(comic: str, chapter_row_key: str, background_tasks: Backg
 
 
 @router.get("/api/chapters/{comic}/{chapter_row_key}/translations")
-def get_translations(comic: str, chapter_row_key: str):
+def get_translations(comic: str, chapter_row_key: str, response: Response):
     data = blob.download_chapter_translations(comic, chapter_row_key)
     if data is None:
         raise HTTPException(status_code=404, detail="not translated yet")
+    # Chapters can be re-translated in place; without this, browsers/proxies
+    # may keep serving a stale cached copy after a fresh translate run.
+    response.headers["Cache-Control"] = "no-store"
     return data
