@@ -30,4 +30,4 @@ AI_SERVICES_ENDPOINT = (
     _ai_services_endpoint_raw.rstrip("/") if _ai_services_endpoint_raw else None
 )
 AI_SERVICES_KEY = os.environ.get("AZURE_AI_SERVICES_KEY")
-AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-pro")
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")
