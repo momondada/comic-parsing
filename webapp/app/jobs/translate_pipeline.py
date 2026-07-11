@@ -1,3 +1,4 @@
+import traceback
 from io import BytesIO
 
 from PIL import Image
@@ -56,4 +57,5 @@ async def run_translate(job_id: str, comic: str, chapter_row_key: str) -> None:
         tables.mark_chapter_translated(comic, chapter_row_key)
         tables.update_job(job_id, status="done")
     except Exception as e:
+        traceback.print_exc()
         tables.update_job(job_id, status="failed", error=str(e))
