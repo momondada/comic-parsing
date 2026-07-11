@@ -45,11 +45,28 @@ def scroll_to_bottom(page, pause_ms=1000, max_stable_rounds=3):
             last_height = new_height
 
 
+def _sort_key(image: "CapturedImage") -> tuple[float, float]:
+    """Sort by the page number in the original filename (e.g. 1.jpg, 2.jpg,
+    ...) when the site names pages that way — browsers fetch images
+    concurrently, so arrival order often doesn't match reading order.
+    Non-numeric filenames (e.g. stray comment-section images) sort after all
+    numeric ones, in capture-time order as a stable fallback.
+    """
+    filename = get_filename_from_url(image.url)
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    try:
+        page_number = float(stem)
+    except ValueError:
+        page_number = float("inf")
+    return (page_number, image.time)
+
+
 def capture_images(url: str) -> list[CapturedImage]:
     """Open url, capture jpg network responses, scroll to the bottom to
-    trigger lazy-loaded images, then return everything captured in
-    capture-time order. Runs synchronously (sync_playwright); callers on an
-    event loop should run this in a thread pool.
+    trigger lazy-loaded images, then return everything sorted by the
+    original filename's page number (falling back to capture-time order
+    for non-numeric filenames). Runs synchronously (sync_playwright);
+    callers on an event loop should run this in a thread pool.
     """
     captured: list[CapturedImage] = []
 
@@ -76,5 +93,5 @@ def capture_images(url: str) -> list[CapturedImage]:
         page.remove_listener("response", handle_response)
         browser.close()
 
-    captured.sort(key=lambda item: item.time)
+    captured.sort(key=_sort_key)
     return captured
