@@ -1,10 +1,13 @@
 from pathlib import Path
 
+import openai
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .routers import batches, jobs, library, media, submit, translations
 from .storage import blob, tables
+
+print(f"[diagnostic] openai package version: {openai.__version__}", flush=True)
 
 app = FastAPI(title="Comic Reader")
 
