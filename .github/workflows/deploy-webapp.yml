@@ -2,7 +2,7 @@ name: Deploy Comic Reader Webapp
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "webapp/**"
       - ".github/workflows/deploy-webapp.yml"
