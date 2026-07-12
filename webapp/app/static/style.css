@@ -155,7 +155,7 @@ body.reader-page {
   line-height: 1.25;
   padding: 3px 6px;
   border-radius: 4px;
-  pointer-events: none;
+  cursor: pointer;
   /* No explicit width/height: the box shrink-wraps to whatever text ends
      up inside (bounded by the max-width set inline), so the background
      always fully covers the en+zh pair instead of a fixed size clipped
@@ -173,4 +173,22 @@ body.reader-page {
 .bubble-zh {
   font-size: 15px;
   font-weight: 600;
+}
+
+/* Collapsed = just a small tappable marker at the bubble's position;
+   its own text stays hidden until tapped, independent of any other
+   bubble's state. */
+.bubble.collapsed {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(122, 184, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.bubble.collapsed .bubble-en,
+.bubble.collapsed .bubble-zh {
+  display: none;
 }

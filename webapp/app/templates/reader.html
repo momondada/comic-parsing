@@ -73,6 +73,12 @@
 
           div.appendChild(enEl);
           div.appendChild(zhEl);
+          // Each bubble toggles its own collapsed/expanded state
+          // independently — tapping one doesn't affect any other, so a
+          // reader can peek at just the lines they're stuck on.
+          div.addEventListener("click", () => {
+            div.classList.toggle("collapsed");
+          });
           pageEl.appendChild(div);
         });
       });
@@ -82,8 +88,11 @@
 
     toggleBtn.addEventListener("click", () => {
       translationsVisible = !translationsVisible;
+      // Bulk override: collapse every bubble to a small dot, or expand
+      // them all back — individual taps still work independently after
+      // this within whichever state it left them in.
       document.querySelectorAll(".bubble").forEach((el) => {
-        el.style.display = translationsVisible ? "flex" : "none";
+        el.classList.toggle("collapsed", !translationsVisible);
       });
       toggleBtn.textContent = translationsVisible ? "隱藏翻譯" : "顯示翻譯";
     });
