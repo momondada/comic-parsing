@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
@@ -11,6 +12,14 @@ from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
 MAX_WORKERS = 4
+
+# Caps how many chapters translate at once. Each chapter already fans out to
+# MAX_WORKERS OCR threads internally, so an unbounded number of chapters
+# (e.g. every chapter from a batch download firing off its own translation)
+# would pile up CPU-bound image work and starve the rest of the app on the
+# App Service plan's single core.
+MAX_CONCURRENT_CHAPTERS = 2
+_translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
 
 
 def _ocr_page(comic: str, chapter_row_key: str, filename: str):
@@ -70,13 +79,24 @@ def _process_chapter(comic: str, chapter_row_key: str) -> dict:
 
 
 async def run_translate(job_id: str, comic: str, chapter_row_key: str) -> None:
-    tables.update_job(job_id, status="running", comic=comic, chapter_row_key=chapter_row_key)
+    # tables.* calls are blocking network I/O (Azure Table Storage), so each
+    # one must go through run_in_threadpool — calling them directly here
+    # would block the single asyncio event loop for the whole app until the
+    # call returns, freezing every other request, not just this job.
+    async with _translate_semaphore:
+        await run_in_threadpool(
+            tables.update_job,
+            job_id,
+            status="running",
+            comic=comic,
+            chapter_row_key=chapter_row_key,
+        )
 
-    try:
-        data = await run_in_threadpool(_process_chapter, comic, chapter_row_key)
-        await run_in_threadpool(blob.upload_chapter_translations, comic, chapter_row_key, data)
-        tables.mark_chapter_translated(comic, chapter_row_key)
-        tables.update_job(job_id, status="done")
-    except Exception as e:
-        traceback.print_exc()
-        tables.update_job(job_id, status="failed", error=str(e))
+        try:
+            data = await run_in_threadpool(_process_chapter, comic, chapter_row_key)
+            await run_in_threadpool(blob.upload_chapter_translations, comic, chapter_row_key, data)
+            await run_in_threadpool(tables.mark_chapter_translated, comic, chapter_row_key)
+            await run_in_threadpool(tables.update_job, job_id, status="done")
+        except Exception as e:
+            traceback.print_exc()
+            await run_in_threadpool(tables.update_job, job_id, status="failed", error=str(e))
