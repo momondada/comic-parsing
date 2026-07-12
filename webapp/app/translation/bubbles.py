@@ -5,7 +5,7 @@ from .ocr import OcrLine
 
 GAP_RATIO = 0.7
 OVERLAP_RATIO = 0.3
-PADDING_RATIO = 0.15
+PADDING_RATIO = 0.25
 
 
 @dataclass
