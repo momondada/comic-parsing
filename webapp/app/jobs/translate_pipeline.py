@@ -12,13 +12,13 @@ from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
 # Webtoon-style pages can be extremely tall (e.g. 800x13000+), and each OCR
-# page decodes the full image into memory. On the App Service B1 plan
-# (1 vCPU, ~1.75GB RAM) this got confirmed crashing the whole instance
-# ("interrupted by app restart") from a SINGLE chapter's OCR fan-out at
-# MAX_WORKERS=4 — not just slow, an actual OOM-class restart that also took
-# down unrelated requests. Keep both knobs low until the plan is upgraded.
-MAX_WORKERS = 2
-MAX_CONCURRENT_CHAPTERS = 1
+# page decodes the full image into memory. This previously crashed the App
+# Service B1 plan (1 vCPU, ~1.75GB RAM) outright ("interrupted by app
+# restart") from a SINGLE chapter's OCR fan-out at MAX_WORKERS=4. Now on B3
+# (4 vCPUs, 7GB RAM), so both knobs can come back up for real cross-chapter
+# parallelism — revisit if restarts show up again.
+MAX_WORKERS = 4
+MAX_CONCURRENT_CHAPTERS = 3
 _translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
 
 
