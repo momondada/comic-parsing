@@ -56,14 +56,16 @@ button:disabled { opacity: 0.6; cursor: default; }
 
 .card-list a { text-decoration: none; display: block; }
 
-.chapter-row {
+.chapter-row,
+.comic-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.chapter-row a { flex: 1; }
+.chapter-row a,
+.comic-row a { flex: 1; }
 
 .chapter-actions {
   display: flex;
@@ -75,7 +77,8 @@ button:disabled { opacity: 0.6; cursor: default; }
 }
 
 .rescrape-btn,
-.translate-btn {
+.translate-btn,
+.rename-btn {
   padding: 6px 10px;
   font-size: 13px;
   margin-top: 0;

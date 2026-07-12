@@ -13,11 +13,42 @@
   {% if comics %}
   <ul class="card-list">
     {% for comic in comics %}
-    <li><a href="/library/{{ comic }}">{{ comic }}</a></li>
+    <li class="comic-row">
+      <a href="/library/{{ comic }}">{{ display_names.get(comic, comic) }}</a>
+      <button class="rename-btn" data-comic="{{ comic }}">重新命名</button>
+    </li>
     {% endfor %}
   </ul>
   {% else %}
   <p>還沒有任何漫畫，去下載一話吧。</p>
   {% endif %}
+
+  <script>
+    document.querySelectorAll(".rename-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const comic = btn.dataset.comic;
+        const nameEl = btn.previousElementSibling;
+        const current = nameEl.textContent.trim();
+        const next = window.prompt("輸入書名：", current);
+        if (next === null) return;
+        const trimmed = next.trim();
+        if (!trimmed || trimmed === current) return;
+
+        btn.disabled = true;
+        const res = await fetch(`/api/comics/${encodeURIComponent(comic)}/name`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ display_name: trimmed }),
+        });
+        btn.disabled = false;
+
+        if (res.ok) {
+          nameEl.textContent = trimmed;
+        } else {
+          alert("更新失敗");
+        }
+      });
+    });
+  </script>
 </body>
 </html>

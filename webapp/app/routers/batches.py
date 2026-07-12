@@ -12,6 +12,17 @@ router = APIRouter()
 MAX_BATCH_SIZE = 300
 
 
+class DisplayName(BaseModel):
+    display_name: str
+
+    @model_validator(mode="after")
+    def _validate_name(self):
+        self.display_name = self.display_name.strip()
+        if not self.display_name:
+            raise ValueError("name cannot be empty")
+        return self
+
+
 class BatchRange(BaseModel):
     start: int
     end: int
@@ -52,6 +63,14 @@ def batch_status(batch_id: str):
         "current_chapter": batch.get("current_chapter", ""),
         "error": batch.get("error", ""),
     }
+
+
+@router.put("/api/comics/{comic}/name")
+def rename_comic(comic: str, payload: DisplayName):
+    if not tables.list_chapters(comic):
+        raise HTTPException(status_code=404, detail="comic not found")
+    tables.set_comic_display_name(comic, payload.display_name)
+    return {"display_name": payload.display_name}
 
 
 @router.post("/api/chapters/{comic}/{chapter_row_key}/rescrape")

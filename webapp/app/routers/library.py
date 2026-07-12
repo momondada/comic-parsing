@@ -9,7 +9,10 @@ router = APIRouter()
 @router.get("/library")
 def library(request: Request):
     comics = tables.list_comics()
-    return templates.TemplateResponse(request, "library.html", {"comics": comics})
+    display_names = tables.get_comic_display_names(comics)
+    return templates.TemplateResponse(
+        request, "library.html", {"comics": comics, "display_names": display_names}
+    )
 
 
 @router.get("/library/{comic}")
@@ -17,8 +20,11 @@ def chapters(request: Request, comic: str):
     chapter_rows = tables.list_chapters(comic)
     if not chapter_rows:
         raise HTTPException(status_code=404, detail="comic not found")
+    display_name = tables.get_comic_display_names([comic])[comic]
     return templates.TemplateResponse(
-        request, "chapters.html", {"comic": comic, "chapters": chapter_rows}
+        request,
+        "chapters.html",
+        {"comic": comic, "chapters": chapter_rows, "display_name": display_name},
     )
 
 

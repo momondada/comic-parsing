@@ -142,12 +142,31 @@ def upsert_comic_template(comic: str, url_template: str) -> None:
     )
 
 
-def get_comic_template(comic: str) -> str | None:
+def _get_comic_entity(comic: str) -> dict | None:
     try:
-        entity = _comics_client().get_entity("comic", comic)
+        return dict(_comics_client().get_entity("comic", comic))
     except ResourceNotFoundError:
         return None
-    return entity.get("url_template")
+
+
+def get_comic_template(comic: str) -> str | None:
+    entity = _get_comic_entity(comic)
+    return entity.get("url_template") if entity else None
+
+
+def set_comic_display_name(comic: str, display_name: str) -> None:
+    _comics_client().upsert_entity(
+        {"PartitionKey": "comic", "RowKey": comic, "display_name": display_name}
+    )
+
+
+def get_comic_display_names(comics: list[str]) -> dict[str, str]:
+    """Display name per comic slug, falling back to the slug itself if unset."""
+    names = {}
+    for comic in comics:
+        entity = _get_comic_entity(comic)
+        names[comic] = (entity.get("display_name") if entity else None) or comic
+    return names
 
 
 def create_batch(batch_id: str, comic: str, start: int, end: int) -> None:
