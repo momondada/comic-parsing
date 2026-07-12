@@ -55,6 +55,9 @@ def list_page_filenames(comic: str, chapter_row_key: str) -> list[str]:
     prefix = f"{comic}/{chapter_row_key}/"
     blobs = _container().list_blobs(name_starts_with=prefix)
     names = [b.name[len(prefix) :] for b in blobs]
+    # translations.json lives alongside the page images under the same
+    # prefix but isn't a page itself.
+    names = [n for n in names if not n.endswith(".json")]
     return sorted(names)
 
 
