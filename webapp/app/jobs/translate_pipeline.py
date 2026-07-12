@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from concurrent.futures.process import BrokenProcessPool
 from io import BytesIO
 
@@ -13,23 +14,27 @@ from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
 # One specific chapter (asurascans.com, ~800x13000-15000px webp pages)
-# reproducibly crashed the whole App Service instance ("interrupted by app
-# restart") — on B1 *and* B3 (4x the RAM made no difference), at both
-# MAX_WORKERS=4 and fully serialized MAX_WORKERS=1, with no slowdown
-# warning beforehand. A local offline repro of the image decode/crop/JPEG
-# re-encode steps for all 11 pages ran cleanly, which rules out that code
-# and points at something in the per-page network call (most likely the
-# Vision OCR request) hitting a native-level crash rather than a plain
-# Python exception or memory exhaustion.
-#
-# Rather than chase the exact cause further (would need real server crash
-# logs), OCR now runs in a process pool instead of a thread pool: a crash
-# in a worker PROCESS surfaces to the parent as a normal, catchable
-# BrokenProcessPool exception instead of taking the whole app down with
-# it, regardless of what's actually causing it.
+# reproducibly took down the whole App Service instance. Log Stream showed
+# the real shape of it: OCR completed cleanly through page 004, then the
+# instance went silent mid-request on page 005 — no exception, no crash
+# traceback — until Azure's platform health check gave up on the
+# unresponsive container and force-replaced it ~1s before the old one's
+# own shutdown log even appeared (24s later). That's a hang, not a crash,
+# and it recurred identically across every concurrency configuration
+# tried (B1/B3, MAX_WORKERS 1 and 4), which pointed away from resource
+# exhaustion and at a stalled network call with no client-side timeout —
+# confirmed the Vision client had none configured (see translation/ocr.py,
+# now fixed there). OCR still runs in a process pool as a second layer of
+# defense: even an unrelated hang or crash in a worker now surfaces as a
+# catchable error instead of taking the whole app down with it.
 MAX_WORKERS = 4
 MAX_CONCURRENT_CHAPTERS = 3
 _translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
+
+# Backstop in case something other than the OCR SDK call itself hangs
+# (its own connection/read timeouts are set in translation/ocr.py) — bounds
+# total OCR time for a chapter instead of risking an indefinite hang.
+PAGE_TIMEOUT_SECONDS = 60
 
 
 def _ocr_page(comic: str, chapter_row_key: str, filename: str):
@@ -52,19 +57,30 @@ def _process_chapter(comic: str, chapter_row_key: str) -> dict:
     filenames = [f for f in filenames if not f.endswith(".json")]
 
     per_page_bubbles = {}
-    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)
+    try:
         futures = [
             executor.submit(_ocr_page, comic, chapter_row_key, filename)
             for filename in filenames
         ]
         try:
-            for future in as_completed(futures):
+            total_timeout = PAGE_TIMEOUT_SECONDS * max(len(filenames), 1)
+            for future in as_completed(futures, timeout=total_timeout):
                 filename, bubbles = future.result()
                 per_page_bubbles[filename] = bubbles
         except BrokenProcessPool as e:
             raise RuntimeError(
                 "an OCR worker process crashed while processing this chapter's pages"
             ) from e
+        except FutureTimeoutError as e:
+            raise RuntimeError(
+                "OCR timed out — a worker process appears to be stuck"
+            ) from e
+    finally:
+        # wait=False + cancel_futures: don't let a stuck worker hang this
+        # shutdown call too — that would just move the hang here instead
+        # of fixing it.
+        executor.shutdown(wait=False, cancel_futures=True)
 
     all_texts = [
         bubble.text_en for bubbles in per_page_bubbles.values() for bubble in bubbles

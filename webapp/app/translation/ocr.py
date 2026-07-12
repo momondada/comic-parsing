@@ -18,6 +18,17 @@ STRIP_HEIGHT = 3000
 STRIP_OVERLAP = 300
 
 
+# Without an explicit timeout, azure-core's default is generous enough
+# that a stalled response effectively hangs forever — this was confirmed
+# live: OCR on one chapter's pages hung mid-request with no exception and
+# no crash, until Azure's platform-level health check gave up on the
+# whole (unresponsive) instance and force-replaced the container. A
+# request-level timeout turns that into an ordinary catchable error for
+# just that one page instead of taking the whole app down with it.
+CONNECTION_TIMEOUT = 10
+READ_TIMEOUT = 30
+
+
 def _make_vision_client() -> ImageAnalysisClient:
     if config.AI_SERVICES_KEY:
         from azure.core.credentials import AzureKeyCredential
@@ -25,9 +36,14 @@ def _make_vision_client() -> ImageAnalysisClient:
         return ImageAnalysisClient(
             endpoint=config.AI_SERVICES_ENDPOINT,
             credential=AzureKeyCredential(config.AI_SERVICES_KEY),
+            connection_timeout=CONNECTION_TIMEOUT,
+            read_timeout=READ_TIMEOUT,
         )
     return ImageAnalysisClient(
-        endpoint=config.AI_SERVICES_ENDPOINT, credential=DefaultAzureCredential()
+        endpoint=config.AI_SERVICES_ENDPOINT,
+        credential=DefaultAzureCredential(),
+        connection_timeout=CONNECTION_TIMEOUT,
+        read_timeout=READ_TIMEOUT,
     )
 
 
