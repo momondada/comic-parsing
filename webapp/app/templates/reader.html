@@ -37,10 +37,14 @@
         bubbles.forEach((b) => {
           const div = document.createElement("div");
           div.className = "bubble";
-          div.style.left = `${b.left_pct}%`;
-          div.style.top = `${b.top_pct}%`;
-          div.style.width = `${b.width_pct}%`;
-          div.style.height = `${b.height_pct}%`;
+          // Anchor on the detected bubble's center and let the box size
+          // itself to whatever text ends up inside (en+zh together is
+          // usually longer/taller than the single original OCR line the
+          // bbox was measured from) — a fixed width/height would leave the
+          // background too small and text spilling outside it.
+          div.style.left = `${b.left_pct + b.width_pct / 2}%`;
+          div.style.top = `${b.top_pct + b.height_pct / 2}%`;
+          div.style.maxWidth = `${Math.max(b.width_pct, 12)}%`;
 
           const enEl = document.createElement("div");
           enEl.className = "bubble-en";
