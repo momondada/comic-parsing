@@ -34,6 +34,18 @@ def reader(request: Request, comic: str, chapter_row_key: str):
     if entity is None:
         raise HTTPException(status_code=404, detail="chapter not found")
     filenames = blob.list_page_filenames(comic, chapter_row_key)
+
+    all_chapters = tables.list_chapters(comic)
+    index = next(
+        (i for i, c in enumerate(all_chapters) if c["RowKey"] == chapter_row_key), None
+    )
+    prev_chapter = all_chapters[index - 1] if index is not None and index > 0 else None
+    next_chapter = (
+        all_chapters[index + 1]
+        if index is not None and index + 1 < len(all_chapters)
+        else None
+    )
+
     return templates.TemplateResponse(
         request,
         "reader.html",
@@ -42,5 +54,7 @@ def reader(request: Request, comic: str, chapter_row_key: str):
             "chapter_row_key": chapter_row_key,
             "chapter_display": entity.get("chapter_display", ""),
             "filenames": filenames,
+            "prev_chapter": prev_chapter,
+            "next_chapter": next_chapter,
         },
     )

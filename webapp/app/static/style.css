@@ -114,6 +114,27 @@ body.reader-page {
   gap: 12px;
 }
 
+.chapter-nav {
+  justify-content: space-between;
+  padding-top: 0;
+  font-size: 14px;
+}
+
+.chapter-nav-btn {
+  color: #7ab8ff;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.chapter-nav-btn.disabled {
+  color: #555;
+}
+
+.chapter-nav-current {
+  color: #bbb;
+  white-space: nowrap;
+}
+
 .page {
   position: relative;
 }

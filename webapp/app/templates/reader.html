@@ -11,6 +11,23 @@
     <a href="/library/{{ comic }}">{{ comic }} - 第 {{ chapter_display }} 話</a>
     <button id="translate-toggle" class="rescrape-btn" style="display:none;">隱藏翻譯</button>
   </div>
+  <div class="reader-nav chapter-nav">
+    {% if prev_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ prev_chapter.RowKey }}">
+      上一話（{{ prev_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">上一話</span>
+    {% endif %}
+    <span class="chapter-nav-current">當前話數：{{ chapter_display }}</span>
+    {% if next_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ next_chapter.RowKey }}">
+      下一話（{{ next_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">下一話</span>
+    {% endif %}
+  </div>
   <div class="reader">
     {% for filename in filenames %}
     <div class="page" data-filename="{{ filename }}">
