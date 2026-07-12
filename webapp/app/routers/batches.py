@@ -5,6 +5,8 @@ from pydantic import BaseModel, model_validator
 
 from ..jobs.pipeline import run as run_job
 from ..jobs.pipeline import run_batch
+from ..scraping.latest_chapter import find_latest_chapter
+from ..scraping.slug import derive_url_template
 from ..storage import tables
 
 router = APIRouter()
@@ -63,6 +65,35 @@ def batch_status(batch_id: str):
         "current_chapter": batch.get("current_chapter", ""),
         "error": batch.get("error", ""),
     }
+
+
+@router.post("/api/comics/{comic}/check-latest")
+def check_latest_chapter(comic: str):
+    chapters = tables.list_chapters(comic)
+    if not chapters:
+        raise HTTPException(status_code=404, detail="comic not found")
+
+    latest_known = chapters[-1]
+    current = float(latest_known["chapter_display"])
+    source_url = latest_known.get("source_url", "")
+
+    latest = find_latest_chapter(comic, source_url)
+    if latest is None:
+        raise HTTPException(
+            status_code=400,
+            detail="automatic latest-chapter checking isn't supported for this site yet",
+        )
+
+    # Self-heal: older chapters (or sites where template derivation used to
+    # fail) may not have a stored batch template yet — derive one now from
+    # a known-good chapter URL so the "download the gap" step that follows
+    # a positive check actually has a template to use.
+    if not tables.get_comic_template(comic):
+        template = derive_url_template(source_url)
+        if template:
+            tables.upsert_comic_template(comic, template)
+
+    return {"current": current, "latest": latest, "has_new": latest > current}
 
 
 @router.put("/api/comics/{comic}/name")

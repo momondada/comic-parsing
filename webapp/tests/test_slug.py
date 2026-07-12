@@ -32,6 +32,26 @@ def test_chapter_as_separate_segment():
     assert ref.confidence == "medium"
 
 
+def test_chapter_and_number_as_adjacent_segments():
+    ref = parse_comic_slug(
+        "https://asurascans.com/comics/helmut-the-forsaken-child-a80d257e/chapter/122"
+    )
+    assert ref.comic == "helmut-the-forsaken-child-a80d257e"
+    assert ref.chapter == 122.0
+    assert ref.confidence == "medium"
+
+
+def test_derive_url_template_adjacent_segment_style():
+    url = "https://asurascans.com/comics/helmut-the-forsaken-child-a80d257e/chapter/122"
+    template = derive_url_template(url)
+    assert template == (
+        "https://asurascans.com/comics/helmut-the-forsaken-child-a80d257e/chapter/{chapter}"
+    )
+    assert template.replace("{chapter}", "133") == (
+        "https://asurascans.com/comics/helmut-the-forsaken-child-a80d257e/chapter/133"
+    )
+
+
 def test_unparseable_falls_back_to_domain():
     ref = parse_comic_slug("https://example.com/some/random/page")
     assert ref.comic == "unparsed-example-com"

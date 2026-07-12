@@ -5,7 +5,8 @@ from urllib.parse import urlparse
 PRIMARY = re.compile(r"^(?P<comic>.+?)-chapter-(?P<chapter>\d+(?:\.\d+)?)(?:-.*)?$", re.I)
 CHAPTER_SEGMENT = re.compile(r"^chapter[-_]?(?P<chapter>\d+(?:\.\d+)?)$", re.I)
 CHAPTER_ANYWHERE = re.compile(r"chapter[-_/]?(?P<chapter>\d+(?:\.\d+)?)", re.I)
-TEMPLATE_PATTERN = re.compile(r"(chapter[-_]?)(\d+(?:\.\d+)?)", re.I)
+TEMPLATE_PATTERN = re.compile(r"(chapter[-_/]?)(\d+(?:\.\d+)?)", re.I)
+NUMERIC_SEGMENT = re.compile(r"\d+(?:\.\d+)?")
 BOILERPLATE = {"reader", "en", "read", "manga", "comic", "comics", "series", "title"}
 
 
@@ -69,6 +70,17 @@ def parse_comic_slug(url: str) -> ComicRef:
             )
             if comic:
                 return ComicRef(_normalize(comic), float(m["chapter"]), confidence="medium")
+
+        # e.g. asurascans.com's .../{slug}/chapter/122 — "chapter" and the
+        # number are adjacent path segments rather than joined by a dash.
+        if seg.lower() == "chapter" and i + 1 < len(segments):
+            next_seg = segments[i + 1]
+            if NUMERIC_SEGMENT.fullmatch(next_seg):
+                comic = next(
+                    (s for s in reversed(segments[:i]) if s.lower() not in BOILERPLATE), None
+                )
+                if comic:
+                    return ComicRef(_normalize(comic), float(next_seg), confidence="medium")
 
     m = CHAPTER_ANYWHERE.search(path)
     if m:

@@ -33,13 +33,17 @@ def _fetch(url: str) -> bytes:
         return resp.read()
 
 
+def fetch_text(url: str) -> str:
+    return _fetch(url).decode("utf-8", errors="replace")
+
+
 def try_capture_images(url: str) -> list[CapturedImage] | None:
     """Return page images parsed straight out of the page's HTML, or None
     if this page doesn't have that embedded-JSON shape — callers should
     fall back to full browser-based capture in that case.
     """
     try:
-        page_html = _fetch(url).decode("utf-8", errors="replace")
+        page_html = fetch_text(url)
     except Exception:
         return None
 

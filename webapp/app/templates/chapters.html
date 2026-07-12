@@ -11,6 +11,8 @@
   <p><a href="/library">回到書櫃</a></p>
 
   <h2>批次下載</h2>
+  <button id="check-latest-btn">檢查最新話次</button>
+  <div id="check-latest-status"></div>
   <form id="batch-form">
     <input type="number" id="batch-start" placeholder="起始話數" min="1" required />
     <input type="number" id="batch-end" placeholder="結束話數" min="1" required />
@@ -66,11 +68,7 @@
       }, 2000);
     }
 
-    batchForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const start = parseInt(document.getElementById("batch-start").value, 10);
-      const end = parseInt(document.getElementById("batch-end").value, 10);
-
+    async function submitBatch(start, end) {
       batchBtn.disabled = true;
       batchStatus.textContent = "已送出，開始批次處理...";
 
@@ -89,6 +87,53 @@
 
       const data = await res.json();
       pollBatch(data.batch_id);
+    }
+
+    batchForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const start = parseInt(document.getElementById("batch-start").value, 10);
+      const end = parseInt(document.getElementById("batch-end").value, 10);
+      submitBatch(start, end);
+    });
+
+    const checkLatestBtn = document.getElementById("check-latest-btn");
+    const checkLatestStatus = document.getElementById("check-latest-status");
+
+    checkLatestBtn.addEventListener("click", async () => {
+      checkLatestBtn.disabled = true;
+      checkLatestStatus.textContent = "檢查中...";
+
+      const res = await fetch(`/api/comics/${encodeURIComponent(comic)}/check-latest`, {
+        method: "POST",
+      });
+      checkLatestBtn.disabled = false;
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        checkLatestStatus.innerHTML = `<span class="error">檢查失敗：${err.detail || res.status}</span>`;
+        return;
+      }
+
+      const { current, latest, has_new } = await res.json();
+
+      if (!has_new) {
+        checkLatestStatus.textContent = `目前已是最新（第 ${current} 話）`;
+        return;
+      }
+
+      const start = Math.floor(current) + 1;
+      const end = Math.floor(latest);
+      const confirmed = window.confirm(
+        `發現最新到第 ${latest} 話（目前 ${current} 話），是否下載並翻譯第 ${start}~${end} 話？`
+      );
+
+      if (!confirmed) {
+        checkLatestStatus.textContent = `發現新話（第 ${latest} 話），未下載`;
+        return;
+      }
+
+      checkLatestStatus.textContent = "";
+      submitBatch(start, end);
     });
 
     document.querySelectorAll(".rescrape-btn").forEach((btn) => {
