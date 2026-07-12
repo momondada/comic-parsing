@@ -5,7 +5,15 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
 from .. import config
-from ..scraping.capture import CapturedImage
+from ..scraping.capture import CapturedImage, get_filename_from_url
+
+CONTENT_TYPES = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "gif": "image/gif",
+}
 
 
 def _make_client() -> BlobServiceClient:
@@ -31,9 +39,14 @@ def _container():
 def upload_chapter_images(comic: str, chapter_row_key: str, images: list[CapturedImage]) -> int:
     container = _container()
     for idx, image in enumerate(images, start=1):
-        blob_name = f"{comic}/{chapter_row_key}/{idx:03d}.jpg"
+        source_name = get_filename_from_url(image.url)
+        ext = source_name.rsplit(".", 1)[-1].lower() if "." in source_name else "jpg"
+        blob_name = f"{comic}/{chapter_row_key}/{idx:03d}.{ext}"
         container.upload_blob(
-            blob_name, image.body, overwrite=True, content_type="image/jpeg"
+            blob_name,
+            image.body,
+            overwrite=True,
+            content_type=CONTENT_TYPES.get(ext, "image/jpeg"),
         )
     return len(images)
 

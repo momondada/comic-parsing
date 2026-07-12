@@ -30,7 +30,7 @@ def _ocr_page(comic: str, chapter_row_key: str, filename: str):
 
 def _process_chapter(comic: str, chapter_row_key: str) -> dict:
     filenames = blob.list_page_filenames(comic, chapter_row_key)
-    filenames = [f for f in filenames if f.endswith(".jpg")]
+    filenames = [f for f in filenames if not f.endswith(".json")]
 
     per_page_bubbles = {}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:

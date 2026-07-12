@@ -62,12 +62,22 @@ def _sort_key(image: "CapturedImage") -> tuple[float, float]:
 
 
 def capture_images(url: str) -> list[CapturedImage]:
-    """Open url, capture jpg network responses, scroll to the bottom to
-    trigger lazy-loaded images, then return everything sorted by the
-    original filename's page number (falling back to capture-time order
-    for non-numeric filenames). Runs synchronously (sync_playwright);
-    callers on an event loop should run this in a thread pool.
+    """Return a chapter's page images.
+
+    Tries the fast path first: some sites embed the full ordered page list
+    directly in the page's HTML (see static_html.py), needing only a plain
+    HTTP GET. Falls back to opening a real browser, capturing jpg network
+    responses, and scrolling to the bottom to trigger lazy-loaded images,
+    for sites that only load pages that way (e.g. mgeko.cc). Runs
+    synchronously (sync_playwright); callers on an event loop should run
+    this in a thread pool.
     """
+    from .static_html import try_capture_images
+
+    static_result = try_capture_images(url)
+    if static_result is not None:
+        return static_result
+
     captured: list[CapturedImage] = []
 
     with sync_playwright() as p:
