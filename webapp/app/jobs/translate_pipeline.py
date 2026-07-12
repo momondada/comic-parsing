@@ -1,6 +1,7 @@
 import asyncio
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from io import BytesIO
 
 from PIL import Image
@@ -11,18 +12,22 @@ from ..translation.bubbles import merge_lines_into_bubbles
 from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
-# One specific chapter (asurascans.com, ~800x13000-15000px webp pages) has
+# One specific chapter (asurascans.com, ~800x13000-15000px webp pages)
 # reproducibly crashed the whole App Service instance ("interrupted by app
-# restart") at MAX_WORKERS=4 — on B1 *and* after upgrading to B3 (4 vCPUs,
-# 7GB RAM), with no slowdown warning beforehand (healthz stayed fast right
-# up to the restart). That it didn't improve with 4x the RAM points at a
-# native-level crash (Pillow/webp decode or the OCR SDK choking on this
-# image shape) rather than plain memory exhaustion. Serializing OCR
-# (MAX_WORKERS=1) is a blunt but safe mitigation until this is root-caused
-# with real server logs — cross-chapter parallelism is left in place since
-# that wasn't implicated (the crash reproduced with only one chapter
-# in flight).
-MAX_WORKERS = 1
+# restart") — on B1 *and* B3 (4x the RAM made no difference), at both
+# MAX_WORKERS=4 and fully serialized MAX_WORKERS=1, with no slowdown
+# warning beforehand. A local offline repro of the image decode/crop/JPEG
+# re-encode steps for all 11 pages ran cleanly, which rules out that code
+# and points at something in the per-page network call (most likely the
+# Vision OCR request) hitting a native-level crash rather than a plain
+# Python exception or memory exhaustion.
+#
+# Rather than chase the exact cause further (would need real server crash
+# logs), OCR now runs in a process pool instead of a thread pool: a crash
+# in a worker PROCESS surfaces to the parent as a normal, catchable
+# BrokenProcessPool exception instead of taking the whole app down with
+# it, regardless of what's actually causing it.
+MAX_WORKERS = 4
 MAX_CONCURRENT_CHAPTERS = 3
 _translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
 
@@ -47,14 +52,19 @@ def _process_chapter(comic: str, chapter_row_key: str) -> dict:
     filenames = [f for f in filenames if not f.endswith(".json")]
 
     per_page_bubbles = {}
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
             executor.submit(_ocr_page, comic, chapter_row_key, filename)
             for filename in filenames
         ]
-        for future in as_completed(futures):
-            filename, bubbles = future.result()
-            per_page_bubbles[filename] = bubbles
+        try:
+            for future in as_completed(futures):
+                filename, bubbles = future.result()
+                per_page_bubbles[filename] = bubbles
+        except BrokenProcessPool as e:
+            raise RuntimeError(
+                "an OCR worker process crashed while processing this chapter's pages"
+            ) from e
 
     all_texts = [
         bubble.text_en for bubbles in per_page_bubbles.values() for bubble in bubbles
