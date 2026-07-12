@@ -11,13 +11,18 @@ from ..translation.bubbles import merge_lines_into_bubbles
 from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
-# Webtoon-style pages can be extremely tall (e.g. 800x13000+), and each OCR
-# page decodes the full image into memory. This previously crashed the App
-# Service B1 plan (1 vCPU, ~1.75GB RAM) outright ("interrupted by app
-# restart") from a SINGLE chapter's OCR fan-out at MAX_WORKERS=4. Now on B3
-# (4 vCPUs, 7GB RAM), so both knobs can come back up for real cross-chapter
-# parallelism — revisit if restarts show up again.
-MAX_WORKERS = 4
+# One specific chapter (asurascans.com, ~800x13000-15000px webp pages) has
+# reproducibly crashed the whole App Service instance ("interrupted by app
+# restart") at MAX_WORKERS=4 — on B1 *and* after upgrading to B3 (4 vCPUs,
+# 7GB RAM), with no slowdown warning beforehand (healthz stayed fast right
+# up to the restart). That it didn't improve with 4x the RAM points at a
+# native-level crash (Pillow/webp decode or the OCR SDK choking on this
+# image shape) rather than plain memory exhaustion. Serializing OCR
+# (MAX_WORKERS=1) is a blunt but safe mitigation until this is root-caused
+# with real server logs — cross-chapter parallelism is left in place since
+# that wasn't implicated (the crash reproduced with only one chapter
+# in flight).
+MAX_WORKERS = 1
 MAX_CONCURRENT_CHAPTERS = 3
 _translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
 
