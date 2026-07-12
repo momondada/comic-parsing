@@ -11,14 +11,14 @@ from ..translation.bubbles import merge_lines_into_bubbles
 from ..translation.gpt_translate import normalize_and_translate
 from ..translation.ocr import read_lines
 
-MAX_WORKERS = 4
-
-# Caps how many chapters translate at once. Each chapter already fans out to
-# MAX_WORKERS OCR threads internally, so an unbounded number of chapters
-# (e.g. every chapter from a batch download firing off its own translation)
-# would pile up CPU-bound image work and starve the rest of the app on the
-# App Service plan's single core.
-MAX_CONCURRENT_CHAPTERS = 2
+# Webtoon-style pages can be extremely tall (e.g. 800x13000+), and each OCR
+# page decodes the full image into memory. On the App Service B1 plan
+# (1 vCPU, ~1.75GB RAM) this got confirmed crashing the whole instance
+# ("interrupted by app restart") from a SINGLE chapter's OCR fan-out at
+# MAX_WORKERS=4 — not just slow, an actual OOM-class restart that also took
+# down unrelated requests. Keep both knobs low until the plan is upgraded.
+MAX_WORKERS = 2
+MAX_CONCURRENT_CHAPTERS = 1
 _translate_semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHAPTERS)
 
 
