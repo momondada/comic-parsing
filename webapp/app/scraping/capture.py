@@ -7,6 +7,15 @@ from playwright.sync_api import sync_playwright
 JPG_EXTENSIONS = (".jpg", ".jpeg")
 CHROMIUM_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
 
+# Each supported site gets its own scraping mechanism and image format,
+# picked explicitly by domain rather than inferred (e.g. "try the
+# embedded-JSON shortcut, fall back to a browser if it finds nothing") —
+# the two approaches differ too much (one's a plain HTTP GET expecting
+# webp/png/etc., the other drives a real browser expecting jpg) to treat
+# as one generic path with a fallback.
+ASURA_DOMAIN = "asurascans.com"
+MGEKO_DOMAIN = "mgeko.cc"
+
 
 @dataclass
 class CapturedImage:
@@ -61,23 +70,12 @@ def _sort_key(image: "CapturedImage") -> tuple[float, float]:
     return (page_number, image.time)
 
 
-def capture_images(url: str) -> list[CapturedImage]:
-    """Return a chapter's page images.
-
-    Tries the fast path first: some sites embed the full ordered page list
-    directly in the page's HTML (see static_html.py), needing only a plain
-    HTTP GET. Falls back to opening a real browser, capturing jpg network
-    responses, and scrolling to the bottom to trigger lazy-loaded images,
-    for sites that only load pages that way (e.g. mgeko.cc). Runs
-    synchronously (sync_playwright); callers on an event loop should run
-    this in a thread pool.
+def _capture_via_browser(url: str) -> list[CapturedImage]:
+    """Open a real browser, capture jpg network responses, and scroll to
+    the bottom to trigger lazy-loaded images — for sites (e.g. mgeko.cc)
+    that only load pages that way. Runs synchronously (sync_playwright);
+    callers on an event loop should run this in a thread pool.
     """
-    from .static_html import try_capture_images
-
-    static_result = try_capture_images(url)
-    if static_result is not None:
-        return static_result
-
     captured: list[CapturedImage] = []
 
     with sync_playwright() as p:
@@ -105,3 +103,26 @@ def capture_images(url: str) -> list[CapturedImage]:
 
     captured.sort(key=_sort_key)
     return captured
+
+
+def capture_images(url: str) -> list[CapturedImage]:
+    """Return a chapter's page images, dispatched by the source site's
+    domain rather than guessed from image format or page shape.
+    """
+    domain = urlparse(url).netloc.lower()
+
+    if ASURA_DOMAIN in domain:
+        from .static_html import try_capture_images
+
+        images = try_capture_images(url)
+        if images is None:
+            raise RuntimeError(
+                f"expected {ASURA_DOMAIN}'s embedded page-list JSON but found "
+                "none — the page layout may have changed"
+            )
+        return images
+
+    if MGEKO_DOMAIN in domain:
+        return _capture_via_browser(url)
+
+    raise RuntimeError(f"no scraping method is set up for this site yet: {domain}")
