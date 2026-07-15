@@ -34,7 +34,7 @@ async def submit_novel_translation(background_tasks: BackgroundTasks, file: Uplo
     return {"batch_id": batch_id, "novel": novel_slug}
 
 
-@router.get("/media/novels/{novel}/download")
+@router.get("/api/novels/{novel}/download")
 def download_novel_combined(novel: str):
     data = blob.download_novel_combined(novel)
     if data is None:

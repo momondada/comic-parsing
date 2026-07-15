@@ -35,7 +35,7 @@
         } else if (b.status === "done") {
           clearInterval(pollTimer);
           submitBtn.disabled = false;
-          statusEl.innerHTML = `翻譯完成！完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}。${libraryLink} · <a href="/media/novels/${novel}/download">下載全部話數 txt</a>`;
+          statusEl.innerHTML = `翻譯完成！完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}。${libraryLink} · <a href="/api/novels/${novel}/download">下載全部話數 txt</a>`;
         } else if (b.status === "failed") {
           clearInterval(pollTimer);
           submitBtn.disabled = false;
