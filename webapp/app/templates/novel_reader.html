@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ comic }} 第{{ chapter_display }}話 - Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="reader-page">
+  <div class="reader-nav">
+    <a href="/library/{{ comic }}">{{ comic }} - 第 {{ chapter_display }} 話</a>
+  </div>
+  <div class="reader-nav chapter-nav">
+    {% if prev_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ prev_chapter.RowKey }}">
+      上一話（{{ prev_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">上一話</span>
+    {% endif %}
+    <span class="chapter-nav-current">當前話數：{{ chapter_display }}</span>
+    {% if next_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ next_chapter.RowKey }}">
+      下一話（{{ next_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">下一話</span>
+    {% endif %}
+  </div>
+
+  <div class="novel-text">
+    {% for line in text_zh.split("\n") %}
+    {% if line.strip() %}
+    <p>{{ line }}</p>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="reader-nav chapter-nav">
+    {% if prev_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ prev_chapter.RowKey }}">
+      上一話（{{ prev_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">上一話</span>
+    {% endif %}
+    <span class="chapter-nav-current">當前話數：{{ chapter_display }}</span>
+    {% if next_chapter %}
+    <a class="chapter-nav-btn" href="/reader/{{ comic }}/{{ next_chapter.RowKey }}">
+      下一話（{{ next_chapter.chapter_display }}）
+    </a>
+    {% else %}
+    <span class="chapter-nav-btn disabled">下一話</span>
+    {% endif %}
+  </div>
+  <div class="reader-nav">
+    <a href="/library/{{ comic }}">回到章節列表</a>
+  </div>
+</body>
+</html>

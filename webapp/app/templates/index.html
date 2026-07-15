@@ -11,7 +11,7 @@
   <p><a href="/library">前往我的書櫃</a></p>
 
   <form id="submit-form">
-    <input type="text" id="url" name="url" placeholder="貼上漫畫章節網址" required />
+    <input type="text" id="url" name="url" placeholder="貼上漫畫或小說章節網址" required />
     <button type="submit" id="submit-btn">開始下載</button>
   </form>
 
@@ -23,7 +23,7 @@
     const submitBtn = document.getElementById("submit-btn");
     let pollTimer = null;
 
-    function poll(jobId) {
+    function pollJob(jobId) {
       pollTimer = setInterval(async () => {
         const res = await fetch(`/api/jobs/${jobId}`);
         if (!res.ok) return;
@@ -43,6 +43,26 @@
       }, 2000);
     }
 
+    function pollNovelBatch(batchId, novelCode) {
+      pollTimer = setInterval(async () => {
+        const res = await fetch(`/api/batches/${batchId}`);
+        if (!res.ok) return;
+        const b = await res.json();
+
+        if (b.status === "pending" || b.status === "running") {
+          statusEl.textContent = `翻譯中... 目前第 ${b.current_chapter} 話（完成 ${b.done}、跳過 ${b.skipped}、失敗 ${b.failed} / 共 ${b.total}）`;
+        } else if (b.status === "done") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `完成！完成 ${b.done}、跳過 ${b.skipped}、失敗 ${b.failed} / 共 ${b.total}。<a href="/library/${novelCode}">前往書櫃</a>`;
+        } else if (b.status === "failed") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `<span class="error">${b.error}</span>`;
+        }
+      }, 2000);
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const url = document.getElementById("url").value.trim();
@@ -58,13 +78,18 @@
       });
 
       if (!res.ok) {
-        statusEl.innerHTML = `<span class="error">送出失敗</span>`;
+        const err = await res.json().catch(() => ({}));
+        statusEl.innerHTML = `<span class="error">送出失敗：${err.detail || res.status}</span>`;
         submitBtn.disabled = false;
         return;
       }
 
       const data = await res.json();
-      poll(data.job_id);
+      if (data.kind === "novel") {
+        pollNovelBatch(data.batch_id, data.comic);
+      } else {
+        pollJob(data.job_id);
+      }
     });
   </script>
 </body>

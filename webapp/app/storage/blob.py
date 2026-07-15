@@ -83,3 +83,37 @@ def download_chapter_translations(comic: str, chapter_row_key: str) -> dict | No
     except ResourceNotFoundError:
         return None
     return json.loads(raw)
+
+
+def upload_novel_chapter(novel: str, chapter_row_key: str, text_zh: str) -> None:
+    blob_name = f"{novel}/{chapter_row_key}/text.json"
+    _container().upload_blob(
+        blob_name,
+        json.dumps({"text_zh": text_zh}).encode("utf-8"),
+        overwrite=True,
+        content_type="application/json",
+    )
+
+
+def download_novel_chapter(novel: str, chapter_row_key: str) -> dict | None:
+    blob_name = f"{novel}/{chapter_row_key}/text.json"
+    try:
+        raw = _container().download_blob(blob_name).readall()
+    except ResourceNotFoundError:
+        return None
+    return json.loads(raw)
+
+
+def upload_novel_pdf(novel: str, pdf_bytes: bytes) -> None:
+    blob_name = f"{novel}/combined.pdf"
+    _container().upload_blob(
+        blob_name, pdf_bytes, overwrite=True, content_type="application/pdf"
+    )
+
+
+def download_novel_pdf(novel: str) -> bytes | None:
+    blob_name = f"{novel}/combined.pdf"
+    try:
+        return _container().download_blob(blob_name).readall()
+    except ResourceNotFoundError:
+        return None
