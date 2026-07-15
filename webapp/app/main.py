@@ -4,7 +4,7 @@ import openai
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from .routers import batches, jobs, library, media, novels, submit, translations
+from .routers import batches, jobs, library, media, novel_translate, submit, translations
 from .storage import blob, tables
 
 print(f"[diagnostic] openai package version: {openai.__version__}", flush=True)
@@ -21,7 +21,7 @@ app.include_router(library.router)
 app.include_router(media.router)
 app.include_router(batches.router)
 app.include_router(translations.router)
-app.include_router(novels.router)
+app.include_router(novel_translate.router)
 
 
 @app.on_event("startup")

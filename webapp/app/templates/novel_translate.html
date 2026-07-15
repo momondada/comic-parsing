@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小說翻譯 - Comic Reader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>小說翻譯</h1>
+  <p><a href="/">回到首頁</a></p>
+
+  <form id="upload-form">
+    <input type="file" id="file" name="file" accept=".txt" required />
+    <button type="submit" id="submit-btn">開始翻譯</button>
+  </form>
+
+  <div id="status"></div>
+
+  <script>
+    const form = document.getElementById("upload-form");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    let pollTimer = null;
+
+    function poll(batchId) {
+      pollTimer = setInterval(async () => {
+        const res = await fetch(`/api/batches/${batchId}`);
+        if (!res.ok) return;
+        const b = await res.json();
+
+        if (b.status === "pending" || b.status === "running") {
+          statusEl.textContent = `翻譯中... 目前：${b.current_chapter || "準備中"}（完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}）`;
+        } else if (b.status === "done") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `翻譯完成！完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}。<a href="/media/novel-translations/${batchId}">下載翻譯後的 txt</a>`;
+        } else if (b.status === "failed") {
+          clearInterval(pollTimer);
+          submitBtn.disabled = false;
+          statusEl.innerHTML = `<span class="error">${b.error}</span>`;
+        }
+      }, 2000);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById("file");
+      if (!fileInput.files.length) return;
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "上傳中...";
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      const res = await fetch("/api/novel-translate", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        statusEl.innerHTML = `<span class="error">送出失敗：${err.detail || res.status}</span>`;
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      statusEl.textContent = "已送出，開始翻譯...";
+      poll(data.batch_id);
+    });
+  </script>
+</body>
+</html>

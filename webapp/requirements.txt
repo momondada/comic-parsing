@@ -10,4 +10,3 @@ azure-data-tables==12.5.0
 azure-identity==1.19.0
 azure-ai-vision-imageanalysis==1.0.0
 openai==2.45.0
-reportlab==4.2.5

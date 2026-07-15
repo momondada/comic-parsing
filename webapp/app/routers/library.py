@@ -21,14 +21,6 @@ def chapters(request: Request, comic: str):
     if not chapter_rows:
         raise HTTPException(status_code=404, detail="comic not found")
     display_name = tables.get_comic_display_names([comic])[comic]
-
-    if tables.get_work_kind(comic) == "novel":
-        return templates.TemplateResponse(
-            request,
-            "novel_chapters.html",
-            {"comic": comic, "chapters": chapter_rows, "display_name": display_name},
-        )
-
     return templates.TemplateResponse(
         request,
         "chapters.html",
@@ -52,21 +44,6 @@ def reader(request: Request, comic: str, chapter_row_key: str):
         if index is not None and index + 1 < len(all_chapters)
         else None
     )
-
-    if tables.get_work_kind(comic) == "novel":
-        data = blob.download_novel_chapter(comic, chapter_row_key)
-        return templates.TemplateResponse(
-            request,
-            "novel_reader.html",
-            {
-                "comic": comic,
-                "chapter_row_key": chapter_row_key,
-                "chapter_display": entity.get("chapter_display", ""),
-                "text_zh": data.get("text_zh", "") if data else "",
-                "prev_chapter": prev_chapter,
-                "next_chapter": next_chapter,
-            },
-        )
 
     filenames = blob.list_page_filenames(comic, chapter_row_key)
     return templates.TemplateResponse(
