@@ -28,7 +28,14 @@ def extract_page_urls(page_html: str) -> list[str]:
 
 
 def _fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ja,en-US;q=0.9,en;q=0.8,zh-TW;q=0.7",
+        },
+    )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return resp.read()
 
