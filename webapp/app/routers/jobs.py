@@ -21,7 +21,10 @@ def submit_job(payload: SubmitUrl, background_tasks: BackgroundTasks):
     domain = urlparse(payload.url).netloc.lower()
 
     if NOVEL_DOMAIN in domain:
-        result = prepare_novel_batch(payload.url)
+        try:
+            result = prepare_novel_batch(payload.url)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"failed to check this novel: {e}")
         if result is None:
             raise HTTPException(
                 status_code=400,
