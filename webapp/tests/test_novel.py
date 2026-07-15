@@ -26,6 +26,23 @@ def test_split_chapters_empty_text_returns_empty_list():
     assert split_chapters("   \n  ") == []
 
 
+def test_split_chapters_handles_crlf_line_endings():
+    # Windows text-mode writes ("\n" -> "\r\n") previously broke every
+    # marker match — confirmed live against a real 148-chapter upload,
+    # which got treated as a single ~1.6MB "chapter" as a result.
+    text = (
+        "===== 第 1 話 =====\r\n\r\n"
+        "第一行。\r\n第二行。\r\n\r\n"
+        "===== 第 2 話 =====\r\n\r\n"
+        "第三行。\r\n"
+    )
+    chapters = split_chapters(text)
+    assert chapters == [
+        ("第 1 話", "第一行。\n第二行。"),
+        ("第 2 話", "第三行。"),
+    ]
+
+
 def test_join_chapters_round_trips_with_split():
     chapters = [("第 1 話", "內容一。"), ("第 2 話", "內容二。")]
     joined = join_chapters(chapters)

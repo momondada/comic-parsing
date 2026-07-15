@@ -31,6 +31,13 @@ def split_chapters(text: str) -> list[tuple[str, str]]:
     """Split an uploaded novel txt into (label, body) pairs. Falls back to
     treating the whole file as one chunk if no markers are found.
     """
+    # Normalize line endings before matching: CHAPTER_MARKER's trailing
+    # "$" (MULTILINE) anchors immediately before "\n", so a stray "\r"
+    # from a CRLF-saved file (e.g. Windows text-mode writes) sits between
+    # "=====" and "\n" and silently breaks every match — confirmed live,
+    # where an uploaded 148-chapter file was treated as a single ~1.6MB
+    # chapter because of exactly this.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     matches = list(CHAPTER_MARKER.finditer(text))
     if not matches:
         stripped = text.strip()

@@ -176,7 +176,12 @@ def main():
 
     print(f"Downloading chapters {args.start}-{end} into {output_path}")
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    # newline="\n" forces LF-only output regardless of OS — on Windows,
+    # the default text-mode write silently translates "\n" to "\r\n",
+    # which broke the webapp's "===== label =====" delimiter matching
+    # (its regex anchors "$" right before "\n", and a stray "\r" in
+    # between silently fails every match).
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
         for n in range(args.start, end + 1):
             print(f"Fetching chapter {n}/{end}...")
             text = fetch_chapter_with_retries(novel_code, n)
