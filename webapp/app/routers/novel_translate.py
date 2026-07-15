@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, Re
 from ..jobs.novel_translate_pipeline import run_novel_translation
 from ..rendering import templates
 from ..storage import blob, tables
-from ..translation.novel_text import split_chapters
+from ..translation.novel_text import slugify_filename, split_chapters
 
 router = APIRouter()
 
@@ -27,19 +27,20 @@ async def submit_novel_translation(background_tasks: BackgroundTasks, file: Uplo
     if not chapters:
         raise HTTPException(status_code=400, detail="檔案內容是空的")
 
+    novel_slug = slugify_filename(file.filename)
     batch_id = str(uuid.uuid4())
-    tables.create_batch(batch_id, file.filename, 1, len(chapters))
-    background_tasks.add_task(run_novel_translation, batch_id, chapters)
-    return {"batch_id": batch_id}
+    tables.create_batch(batch_id, novel_slug, 1, len(chapters))
+    background_tasks.add_task(run_novel_translation, batch_id, novel_slug, chapters)
+    return {"batch_id": batch_id, "novel": novel_slug}
 
 
-@router.get("/media/novel-translations/{batch_id}")
-def download_novel_translation(batch_id: str):
-    data = blob.download_novel_translation_result(batch_id)
+@router.get("/media/novels/{novel}/download")
+def download_novel_combined(novel: str):
+    data = blob.download_novel_combined(novel)
     if data is None:
-        raise HTTPException(status_code=404, detail="translation not ready yet")
+        raise HTTPException(status_code=404, detail="沒有已翻譯完成的章節")
     return Response(
         content=data,
         media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="translated_{batch_id}.txt"'},
+        headers={"Content-Disposition": f'attachment; filename="{novel}_translated.txt"'},
     )

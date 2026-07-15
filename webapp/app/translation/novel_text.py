@@ -4,6 +4,28 @@ import re
 # "===== {label} =====" on its own line, e.g. "===== 第 1 話 =====".
 CHAPTER_MARKER = re.compile(r"^===== (.+?) =====$", re.MULTILINE)
 
+CHAPTER_NUMBER = re.compile(r"(\d+(?:\.\d+)?)")
+SLUG_CLEANUP = re.compile(r"[^a-z0-9]+")
+
+
+def chapter_number(label: str, fallback_index: int) -> float:
+    """Pull the chapter number out of a label like "第 148 話" so chapters
+    from a later upload of the same novel sort/append correctly after
+    earlier ones — falls back to upload order if the label has no number.
+    """
+    match = CHAPTER_NUMBER.search(label)
+    return float(match.group(1)) if match else float(fallback_index)
+
+
+def slugify_filename(filename: str) -> str:
+    """Derive a stable novel identifier from the uploaded filename (e.g.
+    "n1662ds.txt" -> "n1662ds") so re-uploading the same novel later
+    reuses the same library entry instead of creating a new one.
+    """
+    stem = filename.rsplit(".", 1)[0].lower()
+    slug = SLUG_CLEANUP.sub("-", stem).strip("-")
+    return slug or "novel"
+
 
 def split_chapters(text: str) -> list[tuple[str, str]]:
     """Split an uploaded novel txt into (label, body) pairs. Falls back to

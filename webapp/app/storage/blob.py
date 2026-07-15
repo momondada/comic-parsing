@@ -85,18 +85,34 @@ def download_chapter_translations(comic: str, chapter_row_key: str) -> dict | No
     return json.loads(raw)
 
 
-def upload_novel_translation_result(batch_id: str, text: str) -> None:
-    blob_name = f"novel-translations/{batch_id}.txt"
+def upload_novel_chapter(novel: str, chapter_row_key: str, label: str, text_zh: str) -> None:
+    blob_name = f"{novel}/{chapter_row_key}/text.json"
     _container().upload_blob(
         blob_name,
-        text.encode("utf-8"),
+        json.dumps({"label": label, "text_zh": text_zh}).encode("utf-8"),
         overwrite=True,
-        content_type="text/plain; charset=utf-8",
+        content_type="application/json",
     )
 
 
-def download_novel_translation_result(batch_id: str) -> bytes | None:
-    blob_name = f"novel-translations/{batch_id}.txt"
+def download_novel_chapter(novel: str, chapter_row_key: str) -> dict | None:
+    blob_name = f"{novel}/{chapter_row_key}/text.json"
+    try:
+        raw = _container().download_blob(blob_name).readall()
+    except ResourceNotFoundError:
+        return None
+    return json.loads(raw)
+
+
+def upload_novel_combined(novel: str, text: str) -> None:
+    blob_name = f"{novel}/combined.txt"
+    _container().upload_blob(
+        blob_name, text.encode("utf-8"), overwrite=True, content_type="text/plain; charset=utf-8"
+    )
+
+
+def download_novel_combined(novel: str) -> bytes | None:
+    blob_name = f"{novel}/combined.txt"
     try:
         return _container().download_blob(blob_name).readall()
     except ResourceNotFoundError:

@@ -23,18 +23,19 @@
     const submitBtn = document.getElementById("submit-btn");
     let pollTimer = null;
 
-    function poll(batchId) {
+    function poll(batchId, novel) {
       pollTimer = setInterval(async () => {
         const res = await fetch(`/api/batches/${batchId}`);
         if (!res.ok) return;
         const b = await res.json();
+        const libraryLink = `<a href="/library/${novel}">前往書庫瀏覽</a>`;
 
         if (b.status === "pending" || b.status === "running") {
-          statusEl.textContent = `翻譯中... 目前：${b.current_chapter || "準備中"}（完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}）`;
+          statusEl.innerHTML = `翻譯中... 目前：${b.current_chapter || "準備中"}（完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}）已翻譯完成的話已可在書庫閱讀。${libraryLink}`;
         } else if (b.status === "done") {
           clearInterval(pollTimer);
           submitBtn.disabled = false;
-          statusEl.innerHTML = `翻譯完成！完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}。<a href="/media/novel-translations/${batchId}">下載翻譯後的 txt</a>`;
+          statusEl.innerHTML = `翻譯完成！完成 ${b.done}、失敗 ${b.failed} / 共 ${b.total}。${libraryLink} · <a href="/media/novels/${novel}/download">下載全部話數 txt</a>`;
         } else if (b.status === "failed") {
           clearInterval(pollTimer);
           submitBtn.disabled = false;
@@ -68,7 +69,7 @@
 
       const data = await res.json();
       statusEl.textContent = "已送出，開始翻譯...";
-      poll(data.batch_id);
+      poll(data.batch_id, data.novel);
     });
   </script>
 </body>

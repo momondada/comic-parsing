@@ -169,6 +169,16 @@ def get_comic_display_names(comics: list[str]) -> dict[str, str]:
     return names
 
 
+def set_work_kind(comic: str, kind: str) -> None:
+    _comics_client().upsert_entity({"PartitionKey": "comic", "RowKey": comic, "kind": kind})
+
+
+def get_work_kind(comic: str) -> str:
+    """"comic" (default, for entries predating this field) or "novel"."""
+    entity = _get_comic_entity(comic)
+    return (entity.get("kind") if entity else None) or "comic"
+
+
 def create_batch(batch_id: str, comic: str, start: int, end: int) -> None:
     _batches_client().create_entity(
         {
